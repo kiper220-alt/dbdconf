@@ -107,8 +107,9 @@ static gboolean dbd_parse_table_header(gconstpointer block, gsize block_size,
 
     size -= sizeof *gvdb_header;
 
-    header->n_bloom_words = guint32_from_le(gvdb_header->n_bloom_words);
     header->n_buckets = guint32_from_le(gvdb_header->n_buckets);
+    header->n_bloom_words = guint32_from_le(gvdb_header->n_bloom_words);
+    header->bloom_shift = header->n_bloom_words >> 27;
     header->n_bloom_words &= (1u << 27) - 1;
 
     if G_UNLIKELY (header->n_bloom_words * sizeof *header->bloom_words > size) {
