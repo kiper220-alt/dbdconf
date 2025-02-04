@@ -1,5 +1,5 @@
-#ifndef LIBDBDCONF_PRIVATE_GVDB_PARSE
 #include "private_gvdb_common.h"
+#ifndef LIBDBDCONF_PRIVATE_GVDB_PARSE
 #define LIBDBDCONF_PRIVATE_GVDB_PARSE
 
 static gconstpointer dbd_table_dereference(gconstpointer file_data, gsize file_size,

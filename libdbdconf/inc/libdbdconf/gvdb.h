@@ -59,12 +59,12 @@ GVariantTableItem *dbd_table_unset(GVariantTableItem *table, const gchar *key);
 /// @param byteswap - byteswap GVariant values.
 /// @param error handler
 /// @return if successful return TRUE, else FALSE.
-gboolean dbd_table_write_to_file(const gchar *filename, gboolean byteswap, GError **error);
+gboolean dbd_table_write_to_file(GVariantTableItem *table, const gchar *filename, gboolean byteswap, GError **error);
 /// @brief Write table into GVDB bytes.
 /// @param byteswap - byteswap GVariant values.
 /// @param error handler
 /// @return if successful return new GBytes* with GVDB, else NULL.
-GBytes *dbd_table_get_raw(gboolean byteswap, GError **error);
+GBytes *dbd_table_get_raw(GVariantTableItem *table, gboolean byteswap, GError **error);
 /// @brief Dump table content in pretty string.
 /// @param tablePath - table current path(or NULL)(Must begin and end with '/', or be "/")(no validations).
 /// @return Pretty string for output.

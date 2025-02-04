@@ -1,5 +1,5 @@
 #include "private_gvdb_parse.h"
-
+#include "private_gvdb_export.h"
 
 GVariantTableItem *dbd_table_new()
 {
@@ -66,8 +66,6 @@ invalid:
     return NULL;
 }
 
-gboolean dbd_table_write_to_file(const gchar *filename, gboolean byteswap, GError **error);
-GBytes *dbd_table_get_raw(gboolean byteswap, GError **error);
 GVariantTableItem *dbd_table_set(GVariantTableItem *table, const gchar *key,
                                  GVariantTableItem *value)
 {

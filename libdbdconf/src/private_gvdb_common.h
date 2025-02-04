@@ -3,6 +3,8 @@
 #include <libdbdconf/gvdb.h>
 #define LIBDBDCONF_PRIVATE_GVDB_COMMON
 
+#ifndef __gvdb_format_h__
+#define __gvdb_format_h__
 typedef struct { guint16 value; } guint16_le;
 typedef struct { guint32 value; } guint32_le;
 
@@ -62,6 +64,8 @@ static inline guint16 guint16_from_le (guint16_le value) {
 #define GVDB_SIGNATURE1 1953390953
 #define GVDB_SWAPPED_SIGNATURE0 GUINT32_SWAP_LE_BE (GVDB_SIGNATURE0)
 #define GVDB_SWAPPED_SIGNATURE1 GUINT32_SWAP_LE_BE (GVDB_SIGNATURE1)
+
+#endif
 
 struct GVariantTableItem_t
 {
