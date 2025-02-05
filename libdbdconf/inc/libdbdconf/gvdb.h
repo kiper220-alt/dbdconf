@@ -69,6 +69,12 @@ GBytes *dbd_table_get_raw(GVariantTableItem *table, gboolean byteswap, GError **
 /// @param tablePath - table current path(or NULL)(Must begin and end with '/', or be "/")(no validations).
 /// @return Pretty string for output.
 GString *dbd_table_dump(GVariantTableItem *table, gchar *tablePath);
+/// @brief Return table child items.
+/// @param table - table current path(or NULL).
+/// @param size - pointer for return size(or NULL).
+/// @return Array of strings with child names, or NULL(if no child is present or table isn't table :) ).
+/// Returned value must be freed with `g_strfreev`.
+gchar** dbd_table_list_child(GVariantTableItem *table, gsize* size);
 
 /// @brief Create new empty item.
 /// @return New empty item (DBD_TYPE_NONE).
@@ -87,11 +93,23 @@ GVariantTableItem *dbd_item_set_list(GVariantTableItem *item, GVariantListElemen
 /// @return return current item.
 GVariantTableItem *dbd_item_list_append(GVariantTableItem *item, GVariantListElement* list,
                                      guint32 length);
-/// @brief Set item value to list, or append to, if it allready non-empty list.
-/// @param item - current item.
+/// @brief Set list value to list, or append to, if it allready non-empty list.
+/// @param list - current list.
 /// @param element - single element to append.
-/// @return return current item.
-GVariantTableItem *dbd_item_list_append_element(GVariantTableItem *item, GVariantListElement element);
+/// @return return current list.
+GVariantTableItem *dbd_item_list_append_element(GVariantTableItem *list, GVariantListElement element);
+/// @brief Set list value to list, or append to, if it allready non-empty list.
+/// @param list - current list.
+/// @param key - key of appended value.
+/// @param variant - value of appended value.
+/// @return return current list.
+GVariantTableItem *dbd_item_list_append_variant(GVariantTableItem *list, const gchar* key, GVariant *value);
+/// @brief Set list value to list, or append to, if it allready non-empty list.
+/// @param list - current list.
+/// @param key - key of appended value.
+/// @param value - value of appended value.
+/// @return return current list.
+GVariantTableItem *dbd_item_list_append_value(GVariantTableItem *list, const gchar* key, GVariantTableItem *value);
 /// @brief Remove item from list by key.
 /// @param item - current item.
 /// @param element - element key.
@@ -138,5 +156,9 @@ GVariantTableItem *dbd_item_ref(GVariantTableItem *item);
 /// @brief Decrease refcounter for current item.
 /// @param item - current item.
 void dbd_item_unref(GVariantTableItem *item);
+
+#ifdef DEBUG
+void run_test();
+#endif
 
 #endif // LIBDBDCONF_PRIVATE_GVDB

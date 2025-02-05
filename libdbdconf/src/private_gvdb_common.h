@@ -165,6 +165,8 @@ static void dbd_dettach(GVariantTableItem *item)
     if (parent) {
         parent->childs -= length;
     }
+
+    item->parent = NULL;
 }
 
 static void dbd_item_clear_unref_dettach(GVariantTableItem *item) 
@@ -183,7 +185,7 @@ static void dbd_item_clear(GVariantTableItem *item)
         g_hash_table_unref(item->table);
         break;
     case DBD_TYPE_LIST:
-        for (int i = item->length; i > 0; --i) {
+        for (gsize i = item->length; i > 0; --i) {
             dbd_dettach(item->list[i-1].item);
             dbd_item_unref(item->list[i - 1].item);
             g_free(item->list[i - 1].key);

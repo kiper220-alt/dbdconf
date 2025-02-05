@@ -57,7 +57,7 @@ static void dbd_item_set_parent(GVariantTableItem *item, GVariantTableItem *pare
     if (item->parent) {
         g_error("%s", "trying to attach item to more than one parent.");
     }
-    if (item->parent == DBD_TYPE_VARIANT) {
+    if (parent->type == DBD_TYPE_VARIANT) {
         g_error("%s", "trying to attach item to variant.");
     }
     item->parent = parent;
