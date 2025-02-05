@@ -1,98 +1,88 @@
 #include <libdbdconf/utils.h>
 
-DBPath* dbpath_new() {
-    return g_malloc0(sizeof(DBPath));
-}
-
-DBPath* dbpath_copy(DBPath* path) {
-    DBPath* copy = g_malloc0(sizeof(DBPath));
-    copy->element = g_malloc(path->length);
-    copy->length = path->length;
-    
-    for (gsize i = 0; i < path->length; ++i) {
-        copy->element[i] = g_string_new_len(path->element[i]->str, path->element[i]->len);
+GVariantTableItem* dbd_table_join_to(GVariantTableItem* table, const gchar* path, gboolean is_dir, GError** error) {
+    if (!path || !*path) {
+        g_error_new_literal(0, 0, "Path is empty path");
+        return NULL;
+    }
+    if (path[0] != '/') {
+        g_error_new_literal(0, 0, "The path must start with '/'");
+    }
+    if (path[1] == '\0' || !table) {
+        return table;
     }
 
-    return copy;
-}
-DBPath* dbpath_free(DBPath* path) {
-    for (gsize i = path->length; i > 0; --i) {
-        g_string_free(path->element[i - 1], TRUE);
-    }
-    g_free(path->element);
-    g_free(path);
-}
+    do {
+        const gchar *begin = ++path;
 
-DBPath* dbpath_new_from_path(const gchar* path) {
-    const gchar* cursor = path + 1;
-    DBPath* db_path = dbpath_new();
-
-    if (!path || path[0] == '\0' || path[0] == '/' && path[1] == '\0') {
-        return db_path;
-    }
-
-    if (*path == '/') {
-        ++path;
-    }
-
-    while(*path != '\0') {
-        while (*cursor != '\0' && *cursor != '/') {
-            ++cursor;
+        while(*path && *path != '/') {
+            ++path;
         }
 
-        
-        if (cursor == path + 1 && *path == '/') { // "...//..."
-            return dbpath_new();
+        if (is_dir && !*path) {
+            if (path == begin) {
+                return table;
+            }
+            g_error_new_literal(0, 0, "The path must end with '/'");
+            return NULL;
+        }
+        if (!is_dir && *path == '/' && !path[1]){
+            g_error_new_literal(0, 0, "The path must not end with '/'");
+            return NULL;
         }
 
-        dbpath_push_len(db_path, path, cursor - path);
-        
-        if (*cursor == '\0') {
-            break;
-        }
-        
-        path = cursor + 1;
-        cursor = path + 1;
+        gchar* key = g_strndup(begin, path - begin);
+        table = dbd_table_get(table, key);
+        g_free(key);
     }
+    while (*path && table && dbd_item_get_type(table) == DBD_TYPE_TABLE);
 
-    return db_path;
-}
-gboolean dbpath_pop(DBPath* path) {
-    if (path->length == 0) {
-        return FALSE;
+    if (is_dir && table && dbd_item_get_type(table) == DBD_TYPE_TABLE) {
+        return table;
     }
-
-    g_string_free(path->element[path->length - 1], TRUE);
-    path->element = g_realloc_n(path->element, --path->length, sizeof(path->element));
-
-    return TRUE;
-}
-void dbpath_push(DBPath* path, const gchar* element) {
-    path->element = g_realloc_n(path->element, path->length + 1, sizeof(path->element));
-    path->element[path->length++] = g_string_new(element);
-
-    return TRUE;
+    if (!is_dir && table && dbd_item_get_type(table) != DBD_TYPE_TABLE) {
+        return table;
+    }
+    return NULL;
 }
 
-GString* dbpath_to_string(DBPath* path) {
-    if (!path || !path->length) {
-        return g_string_new("/");
+GString* dbd_dump_path(GVariantTableItem* table, const gchar* path, GError** error) {
+    table = dbd_table_join_to(table, path, TRUE, error);
+    if (!table) {
+        return NULL;
     }
-    GString* string = g_string_new("/");
-    g_string_append_len(string, path->element[0]->str, path->element[0]->len);
-
-    for (int i = 1; i < path->length; ++i) {
-        g_string_append_len(string, "/", 1);
-        g_string_append_len(string, path->element[i]->str, path->element[i]->len);
-    }
-    g_string_append_len(string, "/", 1);
-
-    return string;
+    return dbd_table_dump(table, "/");
 }
+GString* dbd_list_path(GVariantTableItem* table, const gchar* path, GError** error) {
+    table = dbd_table_join_to(table, path, TRUE, error);
+    GString *result;
+    gsize size;
+    gchar** keys;
 
-void dbpath_push_len(DBPath* path, const gchar* element, gsize len) {
-    path->element = g_realloc_n(path->element, path->length + 1, sizeof(path->element));
-    path->element[path->length++] = g_string_new_len(element, len);
+    if (!table) {
+        return NULL;
+    }
 
-    return TRUE;
+    keys = dbd_table_list_child(table, &size);
+
+    if (!size) {
+        g_strfreev(keys);
+        return g_string_new("");
+    }
+
+    result = g_string_new(keys[0]);
+    for (gsize i = 1; i < size; ++i) {
+        g_string_append_printf(result, "\n%s", keys[i]);
+    }
+
+    g_strfreev(keys);
+    return result;
+}
+GString* dbd_read_path(GVariantTableItem* table, const gchar* path, GError** error) {
+    table = dbd_table_join_to(table, path, FALSE, error);
+    if (!table) {
+        return NULL;
+    }
+
+    return dbd_item_dump(table, "/", FALSE);
 }
