@@ -1,12 +1,14 @@
 #include <libdbdconf/utils.h>
 
+static const gchar* ERROR_QUARK_STRING = "DBD_TABLE_JOIN";
+
 GVariantTableItem* dbd_table_join_to(GVariantTableItem* table, const gchar* path, gboolean is_dir, GError** error) {
     if (!path || !*path) {
-        g_error_new_literal(0, 0, "Path is empty path");
+        g_error_new_literal(g_quark_from_static_string(ERROR_QUARK_STRING), 0, "Path is empty path");
         return NULL;
     }
     if (path[0] != '/') {
-        g_error_new_literal(0, 0, "The path must start with '/'");
+        g_error_new_literal(g_quark_from_static_string(ERROR_QUARK_STRING), 0, "The path must start with '/'");
     }
     if (path[1] == '\0' || !table) {
         return table;
@@ -23,11 +25,11 @@ GVariantTableItem* dbd_table_join_to(GVariantTableItem* table, const gchar* path
             if (path == begin) {
                 return table;
             }
-            g_error_new_literal(0, 0, "The path must end with '/'");
+            g_error_new_literal(g_quark_from_static_string(ERROR_QUARK_STRING), 0, "The path must end with '/'");
             return NULL;
         }
         if (!is_dir && *path == '/' && !path[1]){
-            g_error_new_literal(0, 0, "The path must not end with '/'");
+            g_error_new_literal(g_quark_from_static_string(ERROR_QUARK_STRING), 0, "The path must not end with '/'");
             return NULL;
         }
 

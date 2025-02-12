@@ -142,6 +142,7 @@ gchar **dbd_table_list_child(GVariantTableItem *table, gsize *size) {
     gsize tmp;
     gchar **result;
     gchar **str_iter;
+    GVariantTableItem* item;
     const gchar *key;
 
     GHashTableIter iter;
@@ -164,8 +165,13 @@ gchar **dbd_table_list_child(GVariantTableItem *table, gsize *size) {
     str_iter = result;
 
     g_hash_table_iter_init(&iter, table->table);
-    while (g_hash_table_iter_next(&iter, (gpointer) &key, NULL)) {
-        *str_iter = g_strdup(key);
+    while (g_hash_table_iter_next(&iter, (gpointer) &key, (gpointer) &item)) {
+        if (item->type == DBD_TYPE_TABLE) {
+            *str_iter = g_strdup_printf("%s/", key);
+        } 
+        else {
+            *str_iter = g_strdup(key);
+        }
         ++str_iter;
     }
     *str_iter = NULL;
