@@ -253,7 +253,7 @@ static gboolean dbd_gvdbbuilder_add_list(GvdbBuilder *builder, GVariantTableItem
     guint32_le current_index = guint32_to_le((*item_index)++);
     guint32 hash = dbd_hash(key, NULL);
     guint32 index = dbd_bucketcounter_get_item_index(counter, buckets, hash);
-    guint32 *list_content;
+    guint32_le *list_content;
 
     hash_item[index].hash_value = guint32_to_le(hash);
     hash_item[index].parent = parent;
@@ -268,7 +268,7 @@ static gboolean dbd_gvdbbuilder_add_list(GvdbBuilder *builder, GVariantTableItem
                                                   &hash_item[index].value.pointer);
 
     for (int i = 0; i < list->length; ++i) {
-        list_content[i] = (*item_index);
+        list_content[i] = guint32_to_le(*item_index);
         switch (list->list[i].item->type) {
         case DBD_TYPE_VARIANT:
             dbd_gvdbbuilder_add_variant(builder, list->list[i].item, byteswap, item_index, counter,
