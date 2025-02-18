@@ -113,9 +113,14 @@ GString *dbd_table_dump(GVariantTableItem *table, gchar *tablePath) {
             subpath = g_string_free(tmp, FALSE);
 
             GString *tmp2 = dbd_table_dump(item, subpath);
-            g_string_append_len(sub_table, "\n\n", 2);
-            g_string_append_len(sub_table, tmp2->str, tmp2->len);
-            g_string_free(tmp2, TRUE);
+            if (tmp2) {
+                if (tmp2->len != 0) {
+                    g_string_append_len(sub_table, "\n\n", 2);
+                    g_string_append_len(sub_table, tmp2->str, tmp2->len);
+                }
+
+                g_string_free(tmp2, TRUE);
+            }
             continue;
         }
         if (!header_added) {
@@ -351,7 +356,7 @@ GString *dbd_item_dump(GVariantTableItem *item, gchar *path, gboolean listMode) 
     switch (item->type) {
         case DBD_TYPE_VARIANT: {
             GString *result = g_variant_print_string(item->variant, NULL, FALSE);
-            if (listMode) {
+            if (result && listMode) {
                 for (gsize i = 0; i < result->len; ++i) {
                     if (result->str[i] == '\'') {
                         result->str[i] = '"';
