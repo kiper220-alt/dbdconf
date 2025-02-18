@@ -20,19 +20,19 @@ int main() {
     GError *error = NULL;
     const gchar *filename;
     const gchar *path;
+
     if (g_file_test("../test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
         path = "../test/data/";
-        dir = g_dir_open(path, 0, &error);
-        g_assert_no_error(error);
     }
     else if(g_file_test("../../libdbdconf/test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
         path = "../../libdbdconf/test/data/";
-        dir = g_dir_open(path, 0, &error);
-        g_assert_no_error(error);
     }
     else {
         g_error("%s", "test data folder doesn't found!");
     }
+
+    dir = g_dir_open(path, 0, &error);
+    g_assert_no_error(error);
 
     while ((filename = g_dir_read_name(dir))) {
         gchar* file_full_path = g_strdup_printf("%s%s", path, filename);
