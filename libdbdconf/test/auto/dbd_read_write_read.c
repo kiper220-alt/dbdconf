@@ -31,15 +31,20 @@ int main() {
     g_assert_no_error(error);
 
     while ((filename = g_dir_read_name(dir))) {
+        filename = g_strdup_printf("%s/%s", path, filename);
         table = dbd_table_read_from_file(filename, FALSE, &error);
         g_assert_no_error(error);
 
         bytes = dbd_table_get_raw(table, FALSE, &error);
         g_assert_no_error(error);
         dbd_item_unref(table);
-        dbd_table_read_from_bytes(bytes, FALSE, &error);
+
+        table = dbd_table_read_from_bytes(bytes, FALSE, &error);
+        dbd_item_unref(table);
+
         g_assert_no_error(error);
         g_bytes_unref(bytes);
+        g_free((gpointer) filename);
     }
     g_dir_close(dir);
 }
