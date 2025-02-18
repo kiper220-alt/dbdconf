@@ -4,27 +4,23 @@
 #ifndef LIBDBDCONF_PRIVATE_GVDB_EXPORT
 #define LIBDBDCONF_PRIVATE_GVDB_EXPORT
 
-typedef struct GvdbBuilder_t
-{
+typedef struct GvdbBuilder_t {
     GQueue *chunks;
     gsize offset;
 } GvdbBuilder;
 
-typedef struct BuilderChunk_t
-{
+typedef struct BuilderChunk_t {
     gpointer data;
     gsize size;
     gsize offset;
 } BuilderChunk;
 
-typedef struct BucketCounter_t
-{
+typedef struct BucketCounter_t {
     guint32 *buckets;
     guint32 n_buckets;
 } BucketCounter;
 
-static BucketCounter *dbd_bucketcounter_new(guint32 n_buckets)
-{
+static BucketCounter *dbd_bucketcounter_new(guint32 n_buckets) {
     if (!n_buckets) {
         return NULL;
     }
@@ -35,8 +31,7 @@ static BucketCounter *dbd_bucketcounter_new(guint32 n_buckets)
     return counter;
 }
 
-static guint32 dbd_bucketcounter_add(BucketCounter *bucket_counter, guint32 hash)
-{
+static guint32 dbd_bucketcounter_add(BucketCounter *bucket_counter, guint32 hash) {
     if (!bucket_counter) {
         return -1;
     }
@@ -44,14 +39,12 @@ static guint32 dbd_bucketcounter_add(BucketCounter *bucket_counter, guint32 hash
     return bucket_counter->buckets[hash]++;
 }
 
-static guint32 dbd_bucketcounter_get(BucketCounter *bucket_counter, guint32 bucket)
-{
+static guint32 dbd_bucketcounter_get(BucketCounter *bucket_counter, guint32 bucket) {
     g_assert(bucket < bucket_counter->n_buckets);
     return bucket_counter->buckets[bucket];
 }
 
-static void dbd_bucketcounter_free(BucketCounter *bucket_counter)
-{
+static void dbd_bucketcounter_free(BucketCounter *bucket_counter) {
     if (!bucket_counter) {
         return;
     }
@@ -61,9 +54,9 @@ static void dbd_bucketcounter_free(BucketCounter *bucket_counter)
 
 static gboolean dbd_bucketcounter_counter_table(BucketCounter *bucket_counter,
                                                 GVariantTableItem *item);
+
 static gboolean dbd_bucketcounter_counter_list(BucketCounter *bucket_counter,
-                                               GVariantTableItem *item)
-{
+                                               GVariantTableItem *item) {
     if (!bucket_counter) {
         return FALSE;
     }
@@ -71,7 +64,7 @@ static gboolean dbd_bucketcounter_counter_list(BucketCounter *bucket_counter,
         return FALSE;
     }
     for (guint32 i = 0; i < item->length; ++i) {
-        dbd_bucketcounter_add(bucket_counter, dbd_hash(item->list->key, NULL));
+        dbd_bucketcounter_add(bucket_counter, dbd_hash(item->list[i].key, NULL));
         if (item->list[i].item->type == DBD_TYPE_LIST) {
             if (!dbd_bucketcounter_counter_list(bucket_counter, item->list[i].item)) {
                 return FALSE;
@@ -83,8 +76,7 @@ static gboolean dbd_bucketcounter_counter_list(BucketCounter *bucket_counter,
 }
 
 static gboolean dbd_bucketcounter_counter_table(BucketCounter *bucket_counter,
-                                                GVariantTableItem *item)
-{
+                                                GVariantTableItem *item) {
     if (bucket_counter == NULL || item->type != DBD_TYPE_TABLE) {
         return FALSE;
     }
@@ -95,7 +87,7 @@ static gboolean dbd_bucketcounter_counter_table(BucketCounter *bucket_counter,
 
     g_hash_table_iter_init(&iter, item->table);
 
-    while (g_hash_table_iter_next(&iter, (gpointer*)&key, (gpointer*)&value)) {
+    while (g_hash_table_iter_next(&iter, (gpointer *) &key, (gpointer *) &value)) {
         dbd_bucketcounter_add(bucket_counter, dbd_hash(key, NULL));
         if (value->type == DBD_TYPE_LIST) {
             if (!dbd_bucketcounter_counter_list(bucket_counter, value)) {
@@ -108,8 +100,7 @@ static gboolean dbd_bucketcounter_counter_table(BucketCounter *bucket_counter,
 }
 
 static guint32 dbd_bucketcounter_get_item_index(BucketCounter *counter, const guint32_le *buckets,
-                                                guint32 hash)
-{
+                                                guint32 hash) {
     guint32 bucket;
     guint32 bucket_index;
     guint32 index;
@@ -119,19 +110,17 @@ static guint32 dbd_bucketcounter_get_item_index(BucketCounter *counter, const gu
     return index;
 }
 
-static GvdbBuilder *dbd_gvdbbuilder_new()
-{
+static GvdbBuilder *dbd_gvdbbuilder_new() {
     GvdbBuilder *builder;
 
     builder = g_slice_new(GvdbBuilder);
     builder->chunks = g_queue_new();
-    builder->offset += sizeof(struct gvdb_header);
+    builder->offset = sizeof(struct gvdb_header);
 
     return builder;
 }
 
-static void dbd_gvdbbuilder_free(GvdbBuilder *builder)
-{
+static void dbd_gvdbbuilder_free(GvdbBuilder *builder) {
     if (!builder) {
         return;
     }
@@ -140,8 +129,7 @@ static void dbd_gvdbbuilder_free(GvdbBuilder *builder)
 }
 
 static gboolean dbd_gvdbbuilder_add_string(GvdbBuilder *builder, const gchar *string,
-                                           guint32_le *start, guint16_le *size)
-{
+                                           guint32_le *start, guint16_le *size) {
     BuilderChunk *chunk;
     gsize length;
 
@@ -167,14 +155,13 @@ static gboolean dbd_gvdbbuilder_add_string(GvdbBuilder *builder, const gchar *st
 }
 
 static gpointer dbd_gvdbbuilder_allocate_chunk(GvdbBuilder *builder, guint alignment, gsize size,
-                                               struct gvdb_pointer *pointer)
-{
+                                               struct gvdb_pointer *pointer) {
     if (!size || !builder || !alignment) {
         return NULL;
     }
 
     BuilderChunk *chunk = g_slice_new(BuilderChunk);
-    builder->offset += (guint64)(-builder->offset) & (alignment - 1);
+    builder->offset += (guint64) (-builder->offset) & (alignment - 1);
     chunk->offset = builder->offset;
     chunk->size = size;
     chunk->data = g_malloc(size);
@@ -190,12 +177,10 @@ static gpointer dbd_gvdbbuilder_allocate_chunk(GvdbBuilder *builder, guint align
     return chunk->data;
 }
 
-static gboolean dbd_gvdbbuilder_add_variant(GvdbBuilder *builder, GVariantTableItem *item,
-                                            gboolean byteswap, guint32 *item_index,
-                                            BucketCounter *counter, const guint32_le *buckets,
-                                            const gchar *key, guint32_le parent,
-                                            struct gvdb_hash_item *hash_item)
-{
+static guint32_le dbd_gvdbbuilder_add_variant(GvdbBuilder *builder, GVariantTableItem *item,
+                                              gboolean byteswap, BucketCounter *counter, const guint32_le *buckets,
+                                              const gchar *key, guint32_le parent,
+                                              struct gvdb_hash_item *hash_item) {
     GVariant *variant, *normal;
     gpointer data;
     guint32 hash;
@@ -205,8 +190,16 @@ static gboolean dbd_gvdbbuilder_add_variant(GvdbBuilder *builder, GVariantTableI
     gsize size;
 
     if (!builder || !item || item->type != DBD_TYPE_VARIANT || !counter || !buckets || !hash_item) {
-        return FALSE;
+        return guint32_to_le(-1);
     }
+
+    hash = dbd_hash(key, NULL);
+    index = dbd_bucketcounter_get_item_index(counter, buckets, hash);
+
+    g_assert(hash_item[index].hash_value.value == 0);
+    hash_item[index].hash_value = guint32_to_le(hash);
+    hash_item[index].parent = parent;
+    hash_item[index].type = dbd_item_type_to_char(DBD_TYPE_VARIANT);
 
     if (byteswap) {
         normal = g_variant_byteswap(item->variant);
@@ -216,17 +209,11 @@ static gboolean dbd_gvdbbuilder_add_variant(GvdbBuilder *builder, GVariantTableI
     } else {
         variant = g_variant_new_variant(item->variant);
     }
-    hash = dbd_hash(key, NULL);
-    index = dbd_bucketcounter_get_item_index(counter, buckets, hash);
-
-    hash_item[index].hash_value = guint32_to_le(hash);
-    hash_item[index].parent = parent;
-    hash_item[index].type = dbd_item_type_to_char(DBD_TYPE_VARIANT);
 
     if (!dbd_gvdbbuilder_add_string(builder, key, &hash_item[index].key_start,
                                     &hash_item[index].key_size)) {
         g_variant_unref(variant);
-        return FALSE;
+        return guint32_to_le(-1);
     }
 
     normal = g_variant_get_normal_form(variant);
@@ -236,62 +223,59 @@ static gboolean dbd_gvdbbuilder_add_variant(GvdbBuilder *builder, GVariantTableI
     data = dbd_gvdbbuilder_allocate_chunk(builder, 8, size, &hash_item[index].value.pointer);
     g_variant_store(normal, data);
     g_variant_unref(normal);
-    ++(*item_index);
-    return TRUE;
+    return guint32_to_le(index);
 }
 
-static gboolean dbd_gvdbbuilder_add_list(GvdbBuilder *builder, GVariantTableItem *list,
-                                         gboolean byteswap, guint32 *item_index,
-                                         BucketCounter *counter, const guint32_le *buckets,
-                                         const gchar *key, guint32_le parent,
-                                         struct gvdb_hash_item *hash_item)
-{
+static guint32_le dbd_gvdbbuilder_add_list(GvdbBuilder *builder, GVariantTableItem *list,
+                                           gboolean byteswap,
+                                           BucketCounter *counter, const guint32_le *buckets,
+                                           const gchar *key, guint32_le parent,
+                                           struct gvdb_hash_item *hash_item) {
     if (!builder || !list || list->type != DBD_TYPE_LIST || !counter || !buckets || !hash_item) {
-        return FALSE;
+        return guint32_to_le(-1);
     }
 
-    guint32_le current_index = guint32_to_le((*item_index)++);
     guint32 hash = dbd_hash(key, NULL);
     guint32 index = dbd_bucketcounter_get_item_index(counter, buckets, hash);
+    guint32_le current_index = guint32_to_le(index);
     guint32_le *list_content;
 
+    g_assert(hash_item[index].hash_value.value == 0);
     hash_item[index].hash_value = guint32_to_le(hash);
     hash_item[index].parent = parent;
     hash_item[index].type = dbd_item_type_to_char(DBD_TYPE_LIST);
 
     if (!dbd_gvdbbuilder_add_string(builder, key, &hash_item[index].key_start,
                                     &hash_item[index].key_size)) {
-        return FALSE;
+        return guint32_to_le(-1);
     }
 
     list_content = dbd_gvdbbuilder_allocate_chunk(builder, 4, 4 * list->length,
                                                   &hash_item[index].value.pointer);
 
     for (int i = 0; i < list->length; ++i) {
-        list_content[i] = guint32_to_le(*item_index);
         switch (list->list[i].item->type) {
-        case DBD_TYPE_VARIANT:
-            dbd_gvdbbuilder_add_variant(builder, list->list[i].item, byteswap, item_index, counter,
-                                        buckets, list->list[i].key, current_index, hash_item);
-            break;
-        case DBD_TYPE_LIST:
-            dbd_gvdbbuilder_add_list(builder, list->list[i].item, byteswap, item_index, counter,
-                                     buckets, list->list[i].key, current_index, hash_item);
-            break;
+            case DBD_TYPE_VARIANT:
+                list_content[i] = dbd_gvdbbuilder_add_variant(builder, list->list[i].item, byteswap, counter,
+                                                              buckets, list->list[i].key, current_index, hash_item);
+                break;
+            case DBD_TYPE_LIST:
+                list_content[i] = dbd_gvdbbuilder_add_list(builder, list->list[i].item, byteswap, counter,
+                                                           buckets, list->list[i].key, current_index, hash_item);
+                break;
         }
     }
-    return TRUE;
+    return current_index;
 }
 
-static gboolean dbd_gvdbbuilder_add_table(GvdbBuilder *builder, GVariantTableItem *table,
-                                          gboolean byteswap, guint32 *item_index,
-                                          BucketCounter *counter, const guint32_le *buckets,
-                                          const gchar *key, guint32_le parent,
-                                          struct gvdb_hash_item *hash_item);
+static guint32_le dbd_gvdbbuilder_add_table(GvdbBuilder *builder, GVariantTableItem *table,
+                                            gboolean byteswap,
+                                            BucketCounter *counter, const guint32_le *buckets,
+                                            const gchar *key, guint32_le parent,
+                                            struct gvdb_hash_item *hash_item);
 
 static gboolean dbd_gvdbbuilder_add_table_content(GvdbBuilder *builder, GVariantTableItem *table,
-                                                  gboolean byteswap, struct gvdb_pointer *pointer)
-{
+                                                  gboolean byteswap, struct gvdb_pointer *pointer) {
     if (!builder || !table || table->type != DBD_TYPE_TABLE) {
         return FALSE;
     }
@@ -308,11 +292,10 @@ static gboolean dbd_gvdbbuilder_add_table_content(GvdbBuilder *builder, GVariant
     const guint32_le table_hdr = guint32_to_le(table->childs);
 
     gsize size = sizeof bloom_hdr + sizeof table_hdr + n_bloom_words * sizeof(guint32_le)
-            + table->childs * sizeof(guint32_le) + table->childs * sizeof(struct gvdb_hash_item);
+                 + table->childs * sizeof(guint32_le) + table->childs * sizeof(struct gvdb_hash_item);
 
     gchar *key;
     GVariantTableItem *item;
-    guint32 item_index = 0;
 
     dbd_bucketcounter_counter_table(buckets_items, table);
 
@@ -321,79 +304,86 @@ static gboolean dbd_gvdbbuilder_add_table_content(GvdbBuilder *builder, GVariant
 #define chunk(s) (size -= (s), data += (s), data - (s))
     memcpy(chunk(sizeof bloom_hdr), &bloom_hdr, sizeof bloom_hdr);
     memcpy(chunk(sizeof table_hdr), &table_hdr, sizeof table_hdr);
-    bloom_filter = (guint32_le *)chunk(n_bloom_words * sizeof(guint32_le));
-    hash_buckets = (guint32_le *)chunk(table->childs * sizeof(guint32_le));
-    hash_items = (struct gvdb_hash_item *)chunk(table->childs * sizeof(struct gvdb_hash_item));
+    bloom_filter = (guint32_le *) chunk(n_bloom_words * sizeof(guint32_le));
+    hash_buckets = (guint32_le *) chunk(table->childs * sizeof(guint32_le));
+    hash_items = (struct gvdb_hash_item *) chunk(table->childs * sizeof(struct gvdb_hash_item));
     g_assert(size == 0);
 #undef chunk
 
     memset(hash_buckets, 0, table->childs * sizeof(guint32_le));
-    memset(hash_items, 0, table->childs * sizeof(guint32_le));
+    memset(hash_items, 0, table->childs * sizeof(struct gvdb_hash_item));
 
     for (int i = 1; i < table->childs; ++i) {
-        hash_buckets[i] = guint32_to_le(guint32_from_le(hash_buckets[i - 1]) + dbd_bucketcounter_get(buckets_items, i - 1));
+        hash_buckets[i] = guint32_to_le(
+                guint32_from_le(hash_buckets[i - 1]) + dbd_bucketcounter_get(buckets_items, i - 1));
     }
 
     dbd_bucketcounter_free(buckets_items);
     buckets_items = dbd_bucketcounter_new(table->childs);
     g_hash_table_iter_init(&iter, table->table);
 
-    while (g_hash_table_iter_next(&iter, (gpointer*)&key, (gpointer*)&item)) {
+    while (g_hash_table_iter_next(&iter, (gpointer *) &key, (gpointer *) &item)) {
         switch (item->type) {
-        case DBD_TYPE_LIST:
-            if (!dbd_gvdbbuilder_add_list(builder, item, byteswap, &item_index, buckets_items,
-                                          hash_buckets, key, guint32_to_le(-1), hash_items)) {
-                return FALSE;
-            }
-            break;
-        case DBD_TYPE_VARIANT:
-            if (!dbd_gvdbbuilder_add_variant(builder, item, byteswap, &item_index, buckets_items,
-                                             hash_buckets, key, guint32_to_le(-1), hash_items)) {
-                return FALSE;
-            }
-            break;
-        case DBD_TYPE_TABLE:
-            if (!dbd_gvdbbuilder_add_table(builder, item, byteswap, &item_index, buckets_items,
-                                           hash_buckets, key, guint32_to_le(-1), hash_items)) {
-                return FALSE;
-            }
-            break;
+            case DBD_TYPE_LIST:
+                if (dbd_gvdbbuilder_add_list(builder, item, byteswap, buckets_items,
+                                             hash_buckets, key, guint32_to_le(-1), hash_items).value == -1) {
+                    dbd_bucketcounter_free(buckets_items);
+                    return FALSE;
+                }
+                break;
+            case DBD_TYPE_VARIANT:
+                if (dbd_gvdbbuilder_add_variant(builder, item, byteswap, buckets_items,
+                                                hash_buckets, key, guint32_to_le(-1), hash_items).value == -1) {
+                    dbd_bucketcounter_free(buckets_items);
+                    return FALSE;
+                }
+                break;
+            case DBD_TYPE_TABLE:
+                if (dbd_gvdbbuilder_add_table(builder, item, byteswap, buckets_items,
+                                              hash_buckets, key, guint32_to_le(-1), hash_items).value == -1) {
+                    dbd_bucketcounter_free(buckets_items);
+                    return FALSE;
+                }
+                break;
         }
     }
 
+    dbd_bucketcounter_free(buckets_items);
     return TRUE;
 }
 
-static gboolean dbd_gvdbbuilder_add_table(GvdbBuilder *builder, GVariantTableItem *table,
-                                          gboolean byteswap, guint32 *item_index,
-                                          BucketCounter *counter, const guint32_le *buckets,
-                                          const gchar *key, guint32_le parent,
-                                          struct gvdb_hash_item *hash_item)
-{
+static guint32_le dbd_gvdbbuilder_add_table(GvdbBuilder *builder, GVariantTableItem *table,
+                                            gboolean byteswap,
+                                            BucketCounter *counter, const guint32_le *buckets,
+                                            const gchar *key, guint32_le parent,
+                                            struct gvdb_hash_item *hash_item) {
     if (!builder || !table || table->type != DBD_TYPE_TABLE || !counter || !buckets || !hash_item) {
-        return FALSE;
+        return guint32_to_le(-1);
     }
 
-    guint32_le current_index = guint32_to_le((*item_index)++);
     guint32 hash = dbd_hash(key, NULL);
     guint32 index = dbd_bucketcounter_get_item_index(counter, buckets, hash);
+    guint32_le current_index = guint32_to_le(index);
 
+    g_assert(hash_item[index].hash_value.value == 0);
     hash_item[index].hash_value = guint32_to_le(hash);
     hash_item[index].parent = parent;
     hash_item[index].type = dbd_item_type_to_char(DBD_TYPE_TABLE);
 
     if (!dbd_gvdbbuilder_add_string(builder, key, &hash_item[index].key_start,
                                     &hash_item[index].key_size)) {
-        return FALSE;
+        return guint32_to_le(-1);
     }
 
-    return dbd_gvdbbuilder_add_table_content(builder, table, byteswap,
-                                             &hash_item[index].value.pointer);
+    if (!dbd_gvdbbuilder_add_table_content(builder, table, byteswap,
+                                           &hash_item[index].value.pointer)) {
+        return guint32_to_le(-1);
+    }
+    return current_index;
 }
 
 static GString *dbd_gvdbbuilder_serialize(GvdbBuilder *builder, gboolean byteswap,
-                                          struct gvdb_pointer root)
-{
+                                          struct gvdb_pointer root) {
     struct gvdb_header header;
     GString *result;
 
@@ -408,7 +398,7 @@ static GString *dbd_gvdbbuilder_serialize(GvdbBuilder *builder, gboolean byteswa
     }
 
     header.root = root;
-    result = g_string_new_len((const gchar*)&header, sizeof header);
+    result = g_string_new_len((const gchar *) &header, sizeof header);
 
     if (!builder) {
         return result;
@@ -419,7 +409,7 @@ static GString *dbd_gvdbbuilder_serialize(GvdbBuilder *builder, gboolean byteswa
 
         if (result->len != chunk->offset) {
             gchar zero[8] = {
-                0,
+                    0,
             };
 
             g_assert(chunk->offset > result->len);
@@ -437,8 +427,7 @@ static GString *dbd_gvdbbuilder_serialize(GvdbBuilder *builder, gboolean byteswa
     return result;
 }
 
-GBytes *dbd_table_get_raw(GVariantTableItem *table, gboolean byteswap, GError **error)
-{
+GBytes *dbd_table_get_raw(GVariantTableItem *table, gboolean byteswap, GError **error) {
     if (!table || table->type != DBD_TYPE_TABLE) {
         return NULL;
     }
@@ -450,20 +439,21 @@ GBytes *dbd_table_get_raw(GVariantTableItem *table, gboolean byteswap, GError **
     gsize str_len;
 
     builder = dbd_gvdbbuilder_new();
-    dbd_gvdbbuilder_add_table_content(builder, table, byteswap, &root);
+    if (!dbd_gvdbbuilder_add_table_content(builder, table, byteswap, &root)) {
+        dbd_gvdbbuilder_free(builder);
+        return NULL;
+    }
     str = dbd_gvdbbuilder_serialize(builder, byteswap, root);
     str_len = str->len;
 
     res = g_bytes_new_take(g_string_free(str, FALSE), str_len);
 
     dbd_gvdbbuilder_free(builder);
-
     return res;
 }
 
 gboolean dbd_table_write_to_file(GVariantTableItem *table, const gchar *filename, gboolean byteswap,
-                                 GError **error)
-{
+                                 GError **error) {
     if (!table || table->type != DBD_TYPE_TABLE || filename == NULL) {
         return FALSE;
     }
