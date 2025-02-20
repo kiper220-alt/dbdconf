@@ -95,6 +95,8 @@ CMakeUserPresets.json
 
 # Build Directory
 build/
+cmake-build-debug-coverage/
+cmake-build-release/
 
 # Testing Directory
 Testing/

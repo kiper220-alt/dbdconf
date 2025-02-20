@@ -1,18 +1,18 @@
-#include <libdbdconf/gvdb.h>
+#include <svdb.h>
 #include <stdio.h>
 
 void dump_table(const gchar* file_path) {
     g_assert(file_path && *file_path);
     GError *error = NULL;
-    GVariantTableItem *table = dbd_table_read_from_file(file_path, FALSE, &error);
+    SvdbTableItem *table = svdb_table_read_from_file(file_path, FALSE, &error);
     g_assert_no_error(error);
 
-    GString* dump = dbd_table_dump(table, "/");
+    GString* dump = svdb_table_dump(table, "/");
     g_assert(dump);
 
     printf("%s", dump->str);
     g_string_free(dump, TRUE);
-    dbd_item_unref(table);
+    svdb_item_unref(table);
 }
 
 int main() {
@@ -24,8 +24,8 @@ int main() {
     if (g_file_test("../test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
         path = "../test/data/";
     }
-    else if(g_file_test("../../libdbdconf/test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
-        path = "../../libdbdconf/test/data/";
+    else if(g_file_test("../../libsvdb/test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
+        path = "../../libsvdb/test/data/";
     }
     else {
         g_error("%s", "test data folder doesn't found!");

@@ -1,4 +1,4 @@
-#include <libdbdconf/gvdb.h>
+#include <svdb.h>
 #include <stdio.h>
 
 // test_data1 - TEST FAILED.
@@ -11,7 +11,7 @@
 int main() {
     GDir *dir;
     GString *tmp;
-    GVariantTableItem *table;
+    SvdbTableItem *table;
     const gchar *path;
     const gchar *filename;
     GError *error = NULL;
@@ -20,8 +20,8 @@ int main() {
     if (g_file_test("../test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
         path = "../test/data/";
     }
-    else if(g_file_test("../../libdbdconf/test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
-        path = "../../libdbdconf/test/data/";
+    else if(g_file_test("../../libsvdb/test/data/", G_FILE_TEST_IS_DIR | G_FILE_TEST_EXISTS)) {
+        path = "../../libsvdb/test/data/";
     }
     else {
         g_error("%s", "test data folder doesn't found!");
@@ -32,15 +32,15 @@ int main() {
 
     while ((filename = g_dir_read_name(dir))) {
         filename = g_strdup_printf("%s/%s", path, filename);
-        table = dbd_table_read_from_file(filename, FALSE, &error);
+        table = svdb_table_read_from_file(filename, FALSE, &error);
         g_assert_no_error(error);
 
-        bytes = dbd_table_get_raw(table, FALSE, &error);
+        bytes = svdb_table_get_raw(table, FALSE, &error);
         g_assert_no_error(error);
-        dbd_item_unref(table);
+        svdb_item_unref(table);
 
-        table = dbd_table_read_from_bytes(bytes, FALSE, &error);
-        dbd_item_unref(table);
+        table = svdb_table_read_from_bytes(bytes, FALSE, &error);
+        svdb_item_unref(table);
 
         g_assert_no_error(error);
         g_bytes_unref(bytes);

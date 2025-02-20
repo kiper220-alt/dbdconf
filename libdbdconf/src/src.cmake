@@ -1,4 +1,0 @@
-
-set(LIBDBDCONF_SOURCES 
-    ${CMAKE_CURRENT_LIST_DIR}/utils.c
-    ${CMAKE_CURRENT_LIST_DIR}/gvdb.c)

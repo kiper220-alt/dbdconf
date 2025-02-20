@@ -1,10 +1,10 @@
 #include <cli.h>
-#include <libdbdconf/utils.h>
+#include <svdb.h>
 #include <stdio.h>
 
 int main(int argc, const char** argv) {
     GError* error = NULL;
-    GVariantTableItem* table;
+    SvdbTableItem* table;
     GString* output = NULL;
     DbdCliInstance *instance = dbd_parse_args(argc, argv);
 
@@ -22,7 +22,7 @@ int main(int argc, const char** argv) {
         return -2;
     }
 
-    table = dbd_table_read_from_file(instance->gvdb_file, FALSE, &error);
+    table = svdb_table_read_from_file(instance->gvdb_file, FALSE, &error);
 
     if (error || !table) {
         printf("%s %s %s", "error while reading ", instance->gvdb_file, "\n");
@@ -34,15 +34,15 @@ int main(int argc, const char** argv) {
 
     switch (instance->command) {
         case DBD_INSTANCE_COMMAND_DUMP: {
-            output = dbd_dump_path(table, instance->path, &error);
+            output = svdb_dump_path(table, instance->path, &error);
             break;
         }
         case DBD_INSTANCE_COMMAND_LIST: {
-            output = dbd_list_path(table, instance->path, &error);
+            output = svdb_list_path(table, instance->path, &error);
             break;
         }
         case DBD_INSTANCE_COMMAND_READ: {
-            output = dbd_read_path(table, instance->path, &error);
+            output = svdb_read_path(table, instance->path, &error);
             break;
         }
     }
@@ -56,7 +56,7 @@ int main(int argc, const char** argv) {
         g_string_free(output, TRUE);
     }
 
-    dbd_item_unref(table);
+    svdb_item_unref(table);
     dbd_free_args(instance);
     return 0;
 }

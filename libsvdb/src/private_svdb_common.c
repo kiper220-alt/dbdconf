@@ -1,24 +1,26 @@
-#ifndef LIBDBDCONF_PRIVATE_GVDB_COMMON
+#ifndef LIBSVDB_PRIVATE_SVDB_COMMON
 #include <glib.h>
-#include <libdbdconf/gvdb.h>
-#define LIBDBDCONF_PRIVATE_GVDB_COMMON
+#include <svdb.h>
+#include <gio/gio.h>
+#include <glib-object.h>
+#define LIBSVDB_PRIVATE_SVDB_COMMON
 
 #ifndef __gvdb_format_h__
 #define __gvdb_format_h__
 typedef struct { guint16 value; } guint16_le;
 typedef struct { guint32 value; } guint32_le;
 
-struct gvdb_pointer {
+struct svdb_pointer {
   guint32_le start;
   guint32_le end;
 };
 
-struct gvdb_hash_header {
+struct svdb_hash_header {
   guint32_le n_bloom_words;
   guint32_le n_buckets;
 };
 
-struct gvdb_hash_item {
+struct svdb_hash_item {
   guint32_le hash_value;
   guint32_le parent;
 
@@ -29,17 +31,17 @@ struct gvdb_hash_item {
 
   union
   {
-    struct gvdb_pointer pointer;
+    struct svdb_pointer pointer;
     gchar direct[8];
   } value;
 };
 
-struct gvdb_header {
+struct svdb_header {
   guint32 signature[2];
   guint32_le version;
   guint32_le options;
 
-  struct gvdb_pointer root;
+  struct svdb_pointer root;
 };
 
 static inline guint32_le guint32_to_le (guint32 value) {
@@ -67,12 +69,12 @@ static inline guint16 guint16_from_le (guint16_le value) {
 
 #endif
 
-struct GVariantTableItem_t
+struct SvdbTableItem_t
 {
     /// @brief Pointer to parent table/list(non-variant, and non-none).
-    GVariantTableItem *parent;
+    SvdbTableItem *parent;
     /// @brief Current type of item.
-    GVariantTableItemType type;
+    SvdbItemType type;
     /// @brief Thread-unsafe refcounter.
     grefcount refcount;
     /// @brief One depth child count. If table => count of all child(non-recursive) + list length of
@@ -86,28 +88,28 @@ struct GVariantTableItem_t
         /// @brief List type.
         struct
         {
-            GVariantListElement *list;
+            SvdbListElement *list;
             gsize length;
         };
     };
 };
 
-typedef struct DBDTableHeader_t
+typedef struct SVDBTableHeader_t
 {
-    struct gvdb_hash_item *hash_items;
+    struct svdb_hash_item *hash_items;
     const guint32_le *bloom_words;
     const guint32_le *hash_buckets;
     guint32 n_bloom_words;
     guint bloom_shift;
     guint32 n_buckets;
     guint32 n_hash_items;
-} DBDTableHeader;
+} SVDBTableHeader;
 
-static guint32 dbd_hash(const gchar *key, guint32 *keylength)
+static guint32 svdb_hash(const gchar *key, guint32 *key_length)
 {
     if (!key || !*key) {
-        if (keylength) {
-            *keylength = 0;
+        if (key_length) {
+            *key_length = 0;
         }
         return 5381;
     }
@@ -119,45 +121,45 @@ static guint32 dbd_hash(const gchar *key, guint32 *keylength)
         hash_value = (hash_value * 33) + ((signed char *)key)[length];
     }
 
-    if (keylength) {
-        *keylength = length;
+    if (key_length) {
+        *key_length = length;
     }
 
     return hash_value;
 }
 
-static gchar dbd_item_type_to_char(GVariantTableItemType type)
+static gchar svdb_item_type_to_char(SvdbItemType type)
 {
     switch (type) {
-    case DBD_TYPE_VARIANT:
+    case SVDB_TYPE_VARIANT:
         return 'v';
-    case DBD_TYPE_TABLE:
+    case SVDB_TYPE_TABLE:
         return 'H';
-    case DBD_TYPE_LIST:
+    case SVDB_TYPE_LIST:
         return 'L';
     }
     return 0;
 }
-static GVariantTableItemType dbd_item_char_to_type(gchar character)
+static SvdbItemType svdb_item_char_to_type(gchar character)
 {
     switch (character) {
     case 'v':
-        return DBD_TYPE_VARIANT;
+        return SVDB_TYPE_VARIANT;
     case 'H':
-        return DBD_TYPE_TABLE;
+        return SVDB_TYPE_TABLE;
     case 'L':
-        return DBD_TYPE_LIST;
+        return SVDB_TYPE_LIST;
     }
-    return DBD_TYPE_NONE;
+    return SVDB_TYPE_NONE;
 }
 
-static void dbd_dettach(GVariantTableItem *item)
+static void svdb_dettach(SvdbTableItem *item)
 {
     guint32 length = item->childs + 1;
 
-    GVariantTableItem *parent = item->parent;
+    SvdbTableItem *parent = item->parent;
 
-    while (parent && parent->type == DBD_TYPE_LIST) {
+    while (parent && parent->type == SVDB_TYPE_LIST) {
         parent->childs -= length;
         parent = parent->parent;
     }
@@ -169,38 +171,38 @@ static void dbd_dettach(GVariantTableItem *item)
     item->parent = NULL;
 }
 
-static void dbd_item_clear_unref_dettach(GVariantTableItem *item) 
+static void svdb_item_clear_unref_dettach(SvdbTableItem *item)
 {
-    dbd_dettach(item);
-    dbd_item_unref(item);
+    svdb_dettach(item);
+    svdb_item_unref(item);
 }
 
-static void dbd_item_clear(GVariantTableItem *item)
+static void svdb_item_clear(SvdbTableItem *item)
 {
     switch (item->type) {
-    case DBD_TYPE_VARIANT:
+    case SVDB_TYPE_VARIANT:
         g_variant_unref(item->variant);
         break;
-    case DBD_TYPE_TABLE:
+    case SVDB_TYPE_TABLE:
         g_hash_table_unref(item->table);
         break;
-    case DBD_TYPE_LIST:
+    case SVDB_TYPE_LIST:
         for (gsize i = item->length; i > 0; --i) {
-            dbd_dettach(item->list[i-1].item);
-            dbd_item_unref(item->list[i - 1].item);
+            svdb_dettach(item->list[i - 1].item);
+            svdb_item_unref(item->list[i - 1].item);
             g_free(item->list[i - 1].key);
         }
         g_free_sized(item->list, sizeof *(item->list) * item->length);
         break;
     }
 
-    item->type = DBD_TYPE_NONE;
+    item->type = SVDB_TYPE_NONE;
     guint32 old = item->childs;
     item->childs = 0;
     
-    GVariantTableItem *parent = item->parent;
+    SvdbTableItem *parent = item->parent;
 
-    while (parent && parent->type == DBD_TYPE_LIST) {
+    while (parent && parent->type == SVDB_TYPE_LIST) {
         parent->childs -= old;
         parent = parent->parent;
     }
@@ -210,19 +212,19 @@ static void dbd_item_clear(GVariantTableItem *item)
     }
 }
 
-static GVariantTableItem *dbd_item_set_table(GVariantTableItem *item, GHashTable *table)
+static SvdbTableItem *svdb_item_set_table(SvdbTableItem *item, GHashTable *table)
 {
     if (!item) {
         return NULL;
     }
-    dbd_item_clear(item);
+    svdb_item_clear(item);
 
     if (!table) {
         return NULL;
     }
 
-    item->type = DBD_TYPE_TABLE;
+    item->type = SVDB_TYPE_TABLE;
     item->table = g_hash_table_ref(table);
     return item;
 }
-#endif // LIBDBDCONF_PRIVATE_GVDB_COMMON 
+#endif // LIBSVDB_PRIVATE_SVDB_COMMON

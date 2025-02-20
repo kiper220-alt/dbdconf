@@ -1,8 +1,8 @@
-#include <libdbdconf/utils.h>
+#include <svdb.h>
 
 static const gchar* ERROR_QUARK_STRING = "DBD_TABLE_JOIN";
 
-GVariantTableItem* dbd_table_join_to(GVariantTableItem* table, const gchar* path, gboolean is_dir, GError** error) {
+SvdbTableItem* svdb_table_join_to(SvdbTableItem* table, const gchar* path, gboolean is_dir, GError** error) {
     if (!path || !*path) {
         g_error_new_literal(g_quark_from_static_string(ERROR_QUARK_STRING), 0, "Path is empty path");
         return NULL;
@@ -34,29 +34,29 @@ GVariantTableItem* dbd_table_join_to(GVariantTableItem* table, const gchar* path
         }
 
         gchar* key = g_strndup(begin, path - begin);
-        table = dbd_table_get(table, key);
+        table = svdb_table_get(table, key);
         g_free(key);
     }
-    while (*path && table && dbd_item_get_type(table) == DBD_TYPE_TABLE);
+    while (*path && table && svdb_item_get_type(table) == SVDB_TYPE_TABLE);
 
-    if (is_dir && table && dbd_item_get_type(table) == DBD_TYPE_TABLE) {
+    if (is_dir && table && svdb_item_get_type(table) == SVDB_TYPE_TABLE) {
         return table;
     }
-    if (!is_dir && table && dbd_item_get_type(table) != DBD_TYPE_TABLE) {
+    if (!is_dir && table && svdb_item_get_type(table) != SVDB_TYPE_TABLE) {
         return table;
     }
     return NULL;
 }
 
-GString* dbd_dump_path(GVariantTableItem* table, const gchar* path, GError** error) {
-    table = dbd_table_join_to(table, path, TRUE, error);
+GString* svdb_dump_path(SvdbTableItem* table, const gchar* path, GError** error) {
+    table = svdb_table_join_to(table, path, TRUE, error);
     if (!table) {
         return NULL;
     }
-    return dbd_table_dump(table, "/");
+    return svdb_table_dump(table, "/");
 }
-GString* dbd_list_path(GVariantTableItem* table, const gchar* path, GError** error) {
-    table = dbd_table_join_to(table, path, TRUE, error);
+GString* svdb_list_path(SvdbTableItem* table, const gchar* path, GError** error) {
+    table = svdb_table_join_to(table, path, TRUE, error);
     GString *result;
     gsize size;
     gchar** keys;
@@ -65,7 +65,7 @@ GString* dbd_list_path(GVariantTableItem* table, const gchar* path, GError** err
         return NULL;
     }
 
-    keys = dbd_table_list_child(table, &size);
+    keys = svdb_table_list_child(table, &size);
 
     if (!size) {
         g_strfreev(keys);
@@ -80,11 +80,11 @@ GString* dbd_list_path(GVariantTableItem* table, const gchar* path, GError** err
     g_strfreev(keys);
     return result;
 }
-GString* dbd_read_path(GVariantTableItem* table, const gchar* path, GError** error) {
-    table = dbd_table_join_to(table, path, FALSE, error);
+GString* svdb_read_path(SvdbTableItem* table, const gchar* path, GError** error) {
+    table = svdb_table_join_to(table, path, FALSE, error);
     if (!table) {
         return NULL;
     }
 
-    return dbd_item_dump(table, "/", FALSE);
+    return svdb_item_dump(table, "/", FALSE);
 }
