@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(dbdconf)
+project(dbdconf LANGUAGES C)
 
 add_subdirectory(libsvdb)
 
