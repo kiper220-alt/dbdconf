@@ -7,7 +7,7 @@ void dump_table(const gchar* file_path) {
     SvdbTableItem *table = svdb_table_read_from_file(file_path, FALSE, &error);
     g_assert_no_error(error);
 
-    GString* dump = svdb_table_dump(table, "/");
+    GString* dump = svdb_item_dump(table, "/", FALSE);
     g_assert(dump);
 
     printf("%s", dump->str);
