@@ -381,7 +381,7 @@ SvdbItemType svdb_item_get_type(const SvdbTableItem *item) {
 
 
 const SvdbListElement *svdb_item_get_list(const SvdbTableItem *item, gsize *length) {
-    if (item->type != SVDB_TYPE_LIST) {
+    if (!item || item->type != SVDB_TYPE_LIST) {
         return NULL;
     }
     if (length) {
@@ -539,6 +539,9 @@ SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar
 }
 
 SvdbTableItem *svdb_item_ref(const SvdbTableItem *item) {
+    if (!item) {
+        return NULL;
+    }
     ++((SvdbTableItem*)item)->refcount;
     return (gpointer) item;
 }

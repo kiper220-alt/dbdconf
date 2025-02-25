@@ -77,10 +77,23 @@ GString* svdb_dump_path(const SvdbTableItem* table, const gchar* path, GError** 
 }
 
 GString* svdb_list_path(const SvdbTableItem* table, const gchar* path, GError** error) {
+    if (!table || !path) {
+        return NULL;
+    }
     table = svdb_table_join_to(table, path, TRUE, error);
+
+    if (!table) {
+        return NULL;
+    }
+
     GString *result = NULL;
     gsize size;
+
     const SvdbListElement* elements = svdb_item_get_list(table, &size);
+
+    if (!elements) {
+        return NULL;
+    }
 
     for (gsize i = 0; i < size; ++i) {
         if (!result) {
