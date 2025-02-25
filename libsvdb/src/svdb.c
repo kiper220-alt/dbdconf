@@ -77,77 +77,20 @@ gboolean svdb_table_set(SvdbTableItem *table, const gchar *key,
     return g_hash_table_replace(table->table, (gpointer) g_strdup(key), svdb_item_ref(value));;
 }
 
-SvdbTableItem *svdb_table_get(SvdbTableItem *table, const gchar *key) {
+SvdbTableItem *svdb_table_get(const SvdbTableItem *table, const gchar *key) {
     if (!table || table->type != SVDB_TYPE_TABLE) {
-        return table;
+        return NULL;
     }
 
     SvdbTableItem *item = g_hash_table_lookup(table->table, key);
-    return item;
-}
-
-GString *svdb_table_dump(SvdbTableItem *table, gchar *tablePath) {
-    if (!table || table->type != SVDB_TYPE_TABLE) {
-        return g_string_new(NULL);
-    }
-    if (tablePath == NULL) {
-        tablePath = "/";
-    }
-    GHashTableIter iter;
-    gchar *key = NULL;
-    SvdbTableItem *item = NULL;
-    GString *result = NULL;
-    GString *sub_table = NULL;
-    gboolean header_added = FALSE;
-
-    result = g_string_new(NULL);
-    sub_table = g_string_new(NULL);
-    g_hash_table_iter_init(&iter, table->table);
-
-    while (g_hash_table_iter_next(&iter, (gpointer *) &key, (gpointer *) &item)) {
-        if (svdb_item_get_type(item) == SVDB_TYPE_TABLE) {
-            GString *tmp = g_string_new(tablePath);
-            gchar *subpath;
-
-            g_string_append_printf(tmp, "%s/", key);
-            subpath = g_string_free(tmp, FALSE);
-
-            GString *tmp2 = svdb_table_dump(item, subpath);
-            if (tmp2) {
-                if (tmp2->len != 0) {
-                    g_string_append_len(sub_table, "\n\n", 2);
-                    g_string_append_len(sub_table, tmp2->str, tmp2->len);
-                }
-
-                g_string_free(tmp2, TRUE);
-            }
-            continue;
-        }
-        if (!header_added) {
-            g_string_append_printf(result, "[%s]", tablePath);
-            header_added = TRUE;
-        }
-        GString *value_str = svdb_item_dump(item, NULL, TRUE);
-        if (item->type == SVDB_TYPE_LIST) {
-            g_string_append_printf(result, "\n%s='%s'", key, value_str->str);
-        } else {
-            g_string_append_printf(result, "\n%s=%s", key, value_str->str);
-        }
-        g_string_free(value_str, TRUE);
-    }
-    if (sub_table->len != 0) {
-        g_string_append_len(result, sub_table->str, sub_table->len);
-    }
-    g_string_free(sub_table, TRUE);
-
-    return result;
+    return svdb_item_ref(item);
 }
 
 /**
  * svdb_table_list_child
  * Returns: (transfer full): value must be freed with `g_strfreev`
  */
-gchar **svdb_table_list_child(SvdbTableItem *table, gsize *size) {
+gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size) {
     gsize tmp;
     gchar **result;
     gchar **str_iter;
@@ -305,6 +248,114 @@ gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, Svdb
     return TRUE;
 }
 
+gboolean svdb_item_list_remove_element(SvdbTableItem *item, const gchar *element) {
+    if (!item || !element || item->type != SVDB_TYPE_LIST || !item->length) {
+        return FALSE;
+    }
+    gsize pos = -1;
+
+    for (gsize i = 0; i < item->length; ++i) {
+        if (strcmp(item->list[i].key, element) == 0) {
+            pos = i;
+            break;
+        }
+    }
+
+    if (pos == -1) {
+        return FALSE;
+    }
+
+    svdb_item_clear_unref_dettach(item->list[pos].item);
+    g_free(item->list[pos].key);
+
+    for (gsize i = pos; i < item->length - 1; ++i) {
+        item->list[i].item = item->list[i + 1].item;
+    }
+    return TRUE;
+}
+
+gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gsize nelements, gboolean exist_cancel) {
+    if (!item || !elements || item->type != SVDB_TYPE_LIST) {
+        return FALSE;
+    }
+
+    if (!*elements) {
+        return TRUE;
+    }
+
+    gsize size = 0;
+    gboolean* exists = NULL;
+    SvdbListElement* new_list = NULL;
+
+    if (exist_cancel) {
+        exists = g_new0(gboolean, nelements);
+    }
+
+    for (gsize i = 0; i < item->length; ++i) {
+        gboolean founded = FALSE;
+        for (gsize j = 0; j < nelements; ++j) {
+            if (strcmp(item->list[i].key, elements[j]) == 0) {
+                founded = TRUE;
+                if (exist_cancel) {
+                    exists[j] = TRUE;
+                }
+                break;
+            }
+        }
+        if (!founded) {
+            new_list = g_realloc_n(new_list, sizeof *new_list, ++size);
+            new_list[size - 1] = item->list[i];
+            item->list[i].item = NULL;
+            item->list[i].key = NULL;
+        }
+    }
+
+    if (exist_cancel) {
+        gboolean all = TRUE;
+        for (gsize i = 0; i < nelements; ++i) {
+            if (!exists[i]) {
+                all = FALSE;
+                break;
+            }
+        }
+        if (!all) {
+            gsize alt_count = 0;
+            for (gsize i = 0; i < item->length; ++i) {
+                if (!item->list[i].key) {
+                    item->list[i] = new_list[alt_count++];
+                }
+            }
+            g_free(new_list);
+            g_free(exists);
+            return FALSE;
+        }
+    }
+    for (gsize i = item->length; i > 0; --i) {
+        if (!item->list[i - 1].key) {
+            g_free(item->list[i - 1].key);
+            svdb_item_clear_unref_dettach(item->list[i - 1].item);
+        }
+    }
+    g_free(item->list);
+    item->list = new_list;
+    item->length = size;
+    return TRUE;
+}
+
+gboolean svdb_item_list_clear(SvdbTableItem *item) {
+    if (!item || item->type != SVDB_TYPE_LIST) {
+        return FALSE;
+    }
+    for (gsize i = item->length; i > 0; --i) {
+        g_free(item->list[i - 1].key);
+        svdb_item_clear_unref_dettach(item->list[i - 1].item);
+    }
+    g_free(item->list);
+    item->list = NULL;
+    item->length = 0;
+    return TRUE;
+}
+
 gboolean svdb_item_set_variant(SvdbTableItem *item, GVariant *variant) {
     if (!item) {
         return FALSE;
@@ -321,7 +372,7 @@ gboolean svdb_item_set_variant(SvdbTableItem *item, GVariant *variant) {
     return TRUE;
 }
 
-SvdbItemType svdb_item_get_type(SvdbTableItem *item) {
+SvdbItemType svdb_item_get_type(const SvdbTableItem *item) {
     if (!item) {
         return SVDB_TYPE_NONE;
     }
@@ -329,7 +380,7 @@ SvdbItemType svdb_item_get_type(SvdbTableItem *item) {
 }
 
 
-const SvdbListElement *svdb_item_get_list(SvdbTableItem *item, gsize *length) {
+const SvdbListElement *svdb_item_get_list(const SvdbTableItem *item, gsize *length) {
     if (item->type != SVDB_TYPE_LIST) {
         return NULL;
     }
@@ -346,89 +397,156 @@ GHashTable *dbd_item_get_table(SvdbTableItem *item) {
     return g_hash_table_ref(item->table);
 }
 
-GVariant *svdb_item_get_variant(SvdbTableItem *item) {
+GVariant *svdb_item_get_variant(const SvdbTableItem *item) {
     if (item->type != SVDB_TYPE_VARIANT) {
         return NULL;
     }
     return g_variant_ref(item->variant);
 }
 
-GString *svdb_item_dump(SvdbTableItem *item, gchar *path, gboolean valueMode) {
+GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean valueMode) {
     if (!item) {
         return g_string_new(NULL);
     }
 
+    if (!path) {
+        path = "/";
+    }
+
     switch (item->type) {
-        case SVDB_TYPE_VARIANT: {
-            GString *result = g_variant_print_string(item->variant, NULL, FALSE);
-            if (result && valueMode) {
-                for (gsize i = 0; i < result->len; ++i) {
-                    if (result->str[i] == '\'') {
-                        result->str[i] = '"';
+        case SVDB_TYPE_LIST: {
+            GString *result = NULL;
+            GString *tmp;
+
+            if (valueMode) {
+                if (item->length == 0) {
+                    return g_string_new_len("{}", 2);
+                }
+                result = g_string_new("{");
+
+                tmp = svdb_item_dump(item->list[0].item, path, TRUE);
+                g_string_append_printf(result, "%s: %s", item->list[0].key, tmp->str);
+                g_string_free(tmp, TRUE);
+
+                for (int i = 1; i < item->length; ++i) {
+                    tmp = svdb_item_dump(item->list[i].item, path, TRUE);
+                    g_string_append_printf(result, ", %s: %s", item->list[i].key, tmp->str);
+                    g_string_free(tmp, TRUE);
+                }
+
+                g_string_append_c(result, '}');
+
+                return result;
+            }
+
+            if (item->length == 0) {
+                return g_string_new(NULL);
+            }
+
+            GString *other = NULL;
+            for (int i = 0; i < item->length; ++i) {
+                if (item->list[i].item->type == SVDB_TYPE_LIST) {
+                    gchar *sub_path = g_strdup_printf("%s%s", path, item->list[i].key);
+                    tmp = svdb_item_dump(item->list[i].item, sub_path, FALSE);
+
+                    if (tmp) {
+                        if (!other) {
+                            other = g_string_new(NULL);
+                        }
+                        else {
+                            g_string_append_len(other, "\n\n", 2);
+                        }
+                        g_string_append_len(other, tmp->str, tmp->len);
+
+                        g_string_free(tmp, TRUE);
                     }
+
+                    g_free(sub_path);
+                    continue;
+                }
+
+                if (!result) {
+                    result = g_string_new_len("[", 1);
+                    g_string_append(result, path);
+                    g_string_append_c(result, ']');
+                }
+                tmp = svdb_item_dump(item->list[i].item, path, FALSE);
+                g_string_append_printf(result, "\n%s=%s", item->list[i].key, tmp->str);
+                g_string_free(tmp, TRUE);
+            }
+            if (other) {
+                if (!result) {
+                    result = other;
+                }
+                else {
+                    g_string_append_len(result, "\n\n", 2);
+                    g_string_append_len(result, other->str, other->len);
+                    g_string_free(other, TRUE);
                 }
             }
+
             return result;
         }
-        case SVDB_TYPE_LIST: {
-            GString *str;
-            if (valueMode) {
-                str = g_string_new("{");
-            }
-            else {
-                str = g_string_new("'{");
-            }
-            gboolean first = TRUE;
-            for (int i = 0; i < item->length; ++i) {
-                GString *tmp = svdb_item_dump(item->list[i].item, NULL, TRUE);
-                if (first) {
-                    g_string_append_printf(str, "\"%s\": %s", item->list[i].key, tmp->str);
-                    first = FALSE;
-                } else {
-                    g_string_append_printf(str, ", \"%s\": %s", item->list[i].key, tmp->str);
-                }
-                g_free(tmp);
-            }
-            if (valueMode) {
-                g_string_append_c(str, '}');
-            }
-            else {
-                g_string_append_len(str, "}'", 2);
-            }
-            return str;
+        case SVDB_TYPE_VARIANT: {
+            return g_variant_print_string(item->variant, NULL, FALSE);
         }
+
         case SVDB_TYPE_TABLE: {
-            if (!valueMode) {
-                return svdb_table_dump(item, path);
-            }
-            GString *str = g_string_new("{");
+            const gchar* key;
+            const SvdbTableItem *key_item;
             GHashTableIter iter;
-            gchar *key;
-            SvdbTableItem *value;
+            GString *result;
+            GString *tmp;
+
             g_hash_table_iter_init(&iter, item->table);
 
-            while (g_hash_table_iter_next(&iter, (gpointer *) &key, (gpointer *) &value)) {
-                GString *tmp = svdb_item_dump(value, NULL, TRUE);
-                g_string_append_printf(str, "\"%s\": %s", key, tmp->str);
-                g_free(tmp);
+            if (!g_hash_table_iter_next(&iter, (gpointer) &key, (gpointer) &key_item)) {
+                return g_string_new("{}");
             }
 
-            g_string_append_c(str, '}');
-            return str;
-        }
-        case SVDB_TYPE_NONE: {
-            g_log(G_LOG_DOMAIN, G_LOG_LEVEL_ERROR, "%s", "Corrupted item in table.");
-            return g_string_new("(NULL)");
+            result = g_string_new("{");
+
+            tmp = svdb_item_dump(key_item, path, TRUE);
+            g_string_append_printf(result, "%s: %s", key, tmp->str);
+            g_string_free(tmp, TRUE);
+
+            while (g_hash_table_iter_next(&iter, (gpointer) &key, (gpointer) &key_item)) {
+                tmp = svdb_item_dump(key_item, path, TRUE);
+                g_string_append_printf(result, ", %s: %s", key, tmp->str);
+                g_string_free(tmp, TRUE);
+            }
+
+            g_string_append_c(result, '}');
+
+            return result;
         }
     }
 }
 
-SvdbTableItem *svdb_item_ref(SvdbTableItem *item) {
-    ++item->refcount;
-    return item;
+SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar* key) {
+    if (!list || list->type != SVDB_TYPE_LIST || list->length == 0 || !key) {
+        return NULL;
+    }
+
+    // Temporary linear search
+    for (int i = 0; i < list->length; ++i) {
+        if (strcmp(list->list[i].key, key) == 0) {
+            return svdb_item_ref(list->list[i].item);
+        }
+    }
+
+    return NULL;
+}
+
+SvdbTableItem *svdb_item_ref(const SvdbTableItem *item) {
+    ++((SvdbTableItem*)item)->refcount;
+    return (gpointer) item;
 }
 
 void svdb_item_unref(SvdbTableItem *item) {
+    if (!item) {
+        return;
+    }
     if (!--item->refcount) {
         svdb_item_clear(item);
         g_free(item);

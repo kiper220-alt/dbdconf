@@ -147,7 +147,7 @@ DbdCliInstance *dbd_parse_args(int argc, const char **argv) {
                     g_free((gpointer) instance->gvdb_file);
                     instance->gvdb_file = NULL;
                     instance->command = DBD_INSTANCE_COMMAND_HELP;
-                    instance->value = g_strdup_printf("%s%s\n%s", "error: unknown command", *argv,
+                    instance->value = g_strdup_printf("%s: %s\n%s", "error: unknown command", *argv,
                                                       DEFAULT_HELP_MESSAGE);
                     return instance;
                 }
@@ -157,7 +157,7 @@ DbdCliInstance *dbd_parse_args(int argc, const char **argv) {
                     g_free((gpointer) instance->gvdb_file);
                     instance->gvdb_file = NULL;
                     instance->command = DBD_INSTANCE_COMMAND_HELP;
-                    instance->value = g_strdup_printf("%s%s\n%s", "error: dir must begin and end with '/'", *argv,
+                    instance->value = g_strdup_printf("%s: %s\n%s", "error: dir must begin and end with '/'", *argv,
                                                       DEFAULT_HELP_MESSAGE);
                     return instance;
                 }

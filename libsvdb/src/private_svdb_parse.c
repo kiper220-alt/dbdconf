@@ -216,6 +216,9 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
             if (curr->item) {
                 ++curr;
             }
+            else {
+                g_free(curr->key);
+            }
             break;
         }
         case SVDB_TYPE_LIST: {
@@ -223,6 +226,9 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
                                                list_element);
             if (curr->item) {
                 ++curr;
+            }
+            else {
+                g_free(curr->key);
             }
             break;
         }
@@ -233,6 +239,9 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
             if (curr->item) {
                 ++curr;
             }
+            else {
+                g_free(curr->key);
+            }
             break;
         }
         }
@@ -242,6 +251,7 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
     while (curr > list_elements) {
         --curr;
         svdb_item_unref(curr->item);
+        g_free(curr->key);
     }
     g_free(list_elements);
 

@@ -69,7 +69,7 @@ gboolean svdb_table_set(SvdbTableItem *table, const gchar *key, SvdbTableItem *v
 /// @param table - current table.
 /// @param key - key of value.
 /// @return item, or NULL.
-SvdbTableItem *svdb_table_get(SvdbTableItem *table, const gchar *key);
+SvdbTableItem *svdb_table_get(const SvdbTableItem *table, const gchar *key);
 
 /// @brief Remove table item by key.
 /// @param table - current table.
@@ -90,18 +90,13 @@ gboolean svdb_table_write_to_file(SvdbTableItem *table, const gchar *filename, g
 /// @return if successful return new GBytes* with GVDB, else NULL.
 GBytes *svdb_table_get_raw(SvdbTableItem *table, gboolean byteswap, GError **error);
 
-/// @brief Dump table content in pretty string.
-/// @param tablePath - table current path(or NULL)(Must begin and end with '/', or be "/")(no validations).
-/// @return Pretty string for output.
-GString *svdb_table_dump(SvdbTableItem *table, gchar *tablePath);
-
 
 /// @brief Return table child items.
 /// @param table - table current path(or NULL).
 /// @param size - pointer for return size(or NULL).
 /// @return Array of strings with child names, or NULL(if no child is present or table isn't table :) ).
 /// Value must be freed with `g_strfreev`
-gchar **svdb_table_list_child(SvdbTableItem *table, gsize *size);
+gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size);
 
 /// @brief Create new empty item.
 /// @return New empty item (SVDB_TYPE_NONE).
@@ -152,9 +147,10 @@ gboolean svdb_item_list_remove_element(SvdbTableItem *item, const gchar *element
 /// @brief Remove items from list by keys. 
 /// @param item - current item.
 /// @param elements - elements keys.
-/// @param nonexist_cancel - if TRUE even one key is missing, the operation will be canceled.
+/// @param nelements - elements keys count.
+/// @param exist_cancel - if TRUE even one key is missing, the operation will be canceled. (+O(n*m) overhead, n - list count, m - elements count)
 /// @return if successful return current item, or NULL.
-gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gboolean nonexist_cancel);
+gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gsize nelements, gboolean exist_cancel);
 
 /// @brief Clear current list to empty state.
 /// @param item - current item.
@@ -171,29 +167,35 @@ gboolean svdb_item_set_variant(SvdbTableItem *item, GVariant *variant);
 /// @param item - current item.
 /// @param length - pointer to length result.
 /// @return array of list element(parent owner) and list length by length pointer, or NULL.
-const SvdbListElement *svdb_item_get_list(SvdbTableItem *item, gsize *length);
+const SvdbListElement *svdb_item_get_list(const SvdbTableItem *item, gsize *length);
 
 /// @brief Get item variant.
 /// @param item - current variant.
 /// @return variant or NULL.
-GVariant *svdb_item_get_variant(SvdbTableItem *item);
+GVariant *svdb_item_get_variant(const SvdbTableItem *item);
 
 /// @brief Get item type
 /// @param item - current item.
 /// @return current item type.
-SvdbItemType svdb_item_get_type(SvdbTableItem *item);
+SvdbItemType svdb_item_get_type(const SvdbTableItem *item);
 
 /// @brief Dump current item into pretty string.
 /// @param item - current item.
 /// @param path - table current path(or NULL)(Must begin and end with '/', or be "/")(no validations).
 /// @param valueMode - true => dump like it value, false => dump like table(if item type is table).
 /// @return Pretty output string.
-GString *svdb_item_dump(SvdbTableItem *item, gchar *path, gboolean valueMode);
+GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean valueMode);
+
+/// @brief Get item from list by name.
+/// @param list - current list.
+/// @param key - element path.
+/// @return child SvdbTableItem (free with svdb_item_unref) or NULL.
+SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar* key);
 
 /// @brief Increase refcounter for current item.
 /// @param item - current item.
 /// @return current item.
-SvdbTableItem *svdb_item_ref(SvdbTableItem *item);
+SvdbTableItem *svdb_item_ref(const SvdbTableItem *item);
 
 /// @brief Decrease refcounter for current item.
 /// @param item - current item.
@@ -205,27 +207,27 @@ void svdb_item_unref(SvdbTableItem *item);
 /// @param is_dir - if path is dir (end with '/') (return SVDB_TYPE_TABLE).
 /// @param error - set value to error, if error occured.
 /// @return if successful and `is_dir == TRUE`(`FALSE`), return child table (list/variant) by path.
-SvdbTableItem *svdb_table_join_to(SvdbTableItem *table, const gchar *path, gboolean is_dir, GError **error);
+SvdbTableItem* svdb_table_join_to(const SvdbTableItem* table, const gchar* path, gboolean is_dir, GError** error);
 
 /// @brief Dump table by path.
 /// @param table - root table for path context.
 /// @param path - path in root table (must start and end with '/').
 /// @param error - set value to error, if error occurred.
 /// @return dump of table by path, or NULL.
-GString *svdb_dump_path(SvdbTableItem *table, const gchar *path, GError **error);
+GString *svdb_dump_path(const SvdbTableItem *table, const gchar *path, GError **error);
 
 /// @brief List child items of table by path.
 /// @param table - root table for path context.
 /// @param path - path in root table (must start and end with '/').
 /// @param error - set value to error, if error occurred.
 /// @return dump of child table elements, or NULL.
-GString *svdb_list_path(SvdbTableItem *table, const gchar *path, GError **error);
+GString *svdb_list_path(const SvdbTableItem *table, const gchar *path, GError **error);
 
 /// @brief Dump variant value in table by path.
 /// @param table - root table for path context.
 /// @param path - path in root table (must start and end with '/').
 /// @param error - set value to error, if error occurred.
 /// @return dump of variant value, or NULL.
-GString *svdb_read_path(SvdbTableItem *table, const gchar *path, GError **error);
+GString *svdb_read_path(const SvdbTableItem *table, const gchar *path, GError **error);
 
 #endif // LIBSVDB_PRIVATE_GVDB
