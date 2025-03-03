@@ -107,7 +107,7 @@ GString* svdb_list_path(const SvdbTableItem* table, const gchar* path, GError** 
 }
 GString* svdb_read_path(const SvdbTableItem* table, const gchar* path, GError** error) {
     table = svdb_table_join_to(table, path, FALSE, error);
-    if (!table) {
+    if (!table || svdb_item_get_type(table) == SVDB_TYPE_LIST) {
         return NULL;
     }
 
