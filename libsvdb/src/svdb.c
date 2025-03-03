@@ -467,7 +467,12 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
 
                 if (!result) {
                     result = g_string_new_len("[", 1);
-                    g_string_append(result, path);
+                    if (path[1] == '\0') {
+                        g_string_append_len(result, "/", 1);
+                    }
+                    else {
+                        g_string_append_len(result, path + 1, strlen(path + 1) - 1);
+                    }
                     g_string_append_c(result, ']');
                 }
                 tmp = svdb_item_dump(item->list[i].item, path, FALSE);
