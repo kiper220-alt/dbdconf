@@ -1,0 +1,96 @@
+_dbdconf_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    cur="${COMP_WORDS[COMP_CWORD]}"  # Current word
+    prev="${COMP_WORDS[COMP_CWORD-1]}"  # Previous word
+    words=("${COMP_WORDS[@]}")  # All words
+    cword=$COMP_CWORD  # Current word position
+
+    local commands="help read list dump"  # Command list
+
+    case $cword in
+        1)
+            # First argument: commands or file path
+            COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+            compopt -o filenames
+            COMPREPLY+=($(compgen -f -- "$cur"))
+            ;;
+
+        2)
+            # Second argument: depends on the first
+            if [[ " $commands " =~ " ${words[1]} " ]]; then
+                # If the first argument is a command, the second is a path to a file
+                compopt -o filenames
+                COMPREPLY=($(compgen -f -- "$cur"))
+            else
+                # If the first argument is a path, the second is a command
+                COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+            fi
+            ;;
+
+        3)
+            # Third argument: define the directory and command
+            if [[ " $commands " =~ " ${words[1]} " ]]; then
+                command="${words[1]}"
+                directory="${words[2]}"
+            elif [[ " $commands " =~ " ${words[2]} " ]]; then
+                command="${words[2]}"
+                directory="${words[1]}"
+            else
+                return  # Incorrect combination
+            fi
+
+            # Autocompletion for read, list, dump commands
+            if [[ "$command" == "help" ]]; then
+                COMPREPLY=()  # No additional arguments for help
+            elif [[ "$command" == "read" || "$command" == "list" || "$command" == "dump" ]]; then
+                compopt -o nospace
+                if [[ -z "$cur" || "$cur" != /* ]]; then
+                    # If the path is not started or does not begin with "/", we suggest "/"
+                    COMPREPLY=("/")
+                else
+                    # Разбираем путь на базовый путь и префикс
+                    if [[ "$cur" == */ ]]; then
+                        base_path="$cur"
+                        prefix=""
+                    else
+                        base_path="${cur%/*}/"
+                        prefix="${cur##*/}"
+                        if [[ "$base_path" != /* ]]; then
+                            base_path="/"
+                        fi
+                    fi
+                    if [[ "$base_path" == "" ]]; then
+                        base_path="/"
+                    fi
+
+                    # Get the contents under base_path
+                    if [[ "$command" != "read" ]]; then
+                      # dump and list can contain only DIR
+                      names=($(dbdconf $(eval echo "${directory}") list $base_path | grep "/$"))
+                    else
+                      names=($(dbdconf $(eval echo "${directory}") list $base_path))
+                    fi
+
+                    # We form suggestions
+                    local suggestions=()
+                    for name in "${names[@]}"; do
+                        suggestions+=("$base_path$name")
+                    done
+
+                    COMPREPLY=($(compgen -W "${suggestions[*]}" -- "$cur"))
+                fi
+            fi
+            ;;
+    esac
+
+    # Add 'help' as an option for the first three positions if it isn't there already
+    if [[ $cword -lt 4 && "${words[*]}" != *"help"* ]]; then
+        COMPREPLY+=($(compgen -S " " -W "help" -- "$cur"))
+    fi
+
+    return 0
+}
+
+complete -F _dbdconf_completion dbdconf
