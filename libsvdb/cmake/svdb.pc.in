@@ -1,0 +1,9 @@
+libdir=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@
+includedir=@CMAKE_INSTALL_PREFIX@/include
+
+Name: libsvdb
+Description: Library for read/write in to specific layer of GVDB.
+Version: @PROJECT_VERSION@
+Requires:
+Libs: -L${libdir} -lsvdb
+Cflags: -I${includedir}
