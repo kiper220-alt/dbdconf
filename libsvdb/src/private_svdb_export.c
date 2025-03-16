@@ -39,6 +39,7 @@ static guint32 svdb_bucketcounter_add(BucketCounter *bucket_counter, guint32 has
 }
 
 static guint32 svdb_bucketcounter_get(BucketCounter *bucket_counter, guint32 bucket) {
+    // TODO: replace by GError* and return
     g_assert(bucket < bucket_counter->n_buckets);
     return bucket_counter->buckets[bucket];
 }
@@ -195,6 +196,7 @@ static guint32_le svdb_gvdbbuilder_add_variant(GvdbBuilder *builder, SvdbTableIt
     hash = svdb_hash(key, NULL);
     index = svdb_bucketcounter_get_item_index(counter, buckets, hash);
 
+    // TODO: replace by GError* and return
     g_assert(hash_item[index].hash_value.value == 0);
     hash_item[index].hash_value = guint32_to_le(hash);
     hash_item[index].parent = parent;
@@ -239,6 +241,7 @@ static guint32_le svdb_gvdbbuilder_add_list(GvdbBuilder *builder, SvdbTableItem 
     guint32_le current_index = guint32_to_le(index);
     guint32_le *list_content;
 
+    // TODO: replace by GError* and return
     g_assert(hash_item[index].hash_value.value == 0);
     hash_item[index].hash_value = guint32_to_le(hash);
     hash_item[index].parent = parent;
@@ -306,6 +309,7 @@ static gboolean svdb_gvdbbuilder_add_table_content(GvdbBuilder *builder, SvdbTab
     bloom_filter = (guint32_le *) chunk(n_bloom_words * sizeof(guint32_le));
     hash_buckets = (guint32_le *) chunk(table->childs * sizeof(guint32_le));
     hash_items = (struct svdb_hash_item *) chunk(table->childs * sizeof(struct svdb_hash_item));
+    // TODO: replace by GError* and return
     g_assert(size == 0);
 #undef chunk
 
@@ -364,6 +368,7 @@ static guint32_le svdb_gvdbbuilder_add_table(GvdbBuilder *builder, SvdbTableItem
     guint32 index = svdb_bucketcounter_get_item_index(counter, buckets, hash);
     guint32_le current_index = guint32_to_le(index);
 
+    // TODO: replace by GError* and return
     g_assert(hash_item[index].hash_value.value == 0);
     hash_item[index].hash_value = guint32_to_le(hash);
     hash_item[index].parent = parent;
@@ -411,10 +416,13 @@ static GString *svdb_gvdbbuilder_serialize(GvdbBuilder *builder, gboolean bytesw
                     0,
             };
 
+            // TODO: replace by GError* and return
             g_assert(chunk->offset > result->len);
+            // TODO: replace by GError* and return
             g_assert(chunk->offset - result->len < 8);
 
             g_string_append_len(result, zero, chunk->offset - result->len);
+            // TODO: replace by GError* and return
             g_assert(result->len == chunk->offset);
         }
 

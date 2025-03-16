@@ -55,9 +55,11 @@ static void svdb_item_set_parent(SvdbTableItem *item, SvdbTableItem *parent)
         return;
     }
     if (item->parent) {
+        // TODO: replace by GError* and return
         g_error("%s", "trying to attach item to more than one parent.");
     }
     if (parent->type == SVDB_TYPE_VARIANT) {
+        // TODO: replace by GError* and return
         g_error("%s", "trying to attach item to variant.");
     }
     item->parent = parent;

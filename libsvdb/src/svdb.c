@@ -129,6 +129,7 @@ gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size) {
     *str_iter = NULL;
 
     // result real length must be equal `g_hash_table_size()`.
+    // TODO: replace by GError* and return
     g_assert(str_iter - result == *size);
 
     return result;
