@@ -1,7 +1,7 @@
 #include "private_svdb_parse.c"
 #include "private_svdb_export.c"
 
-G_DEFINE_BOXED_TYPE (SvdbTableItem, svdb_table, svdb_item_ref, svdb_item_unref)
+G_DEFINE_BOXED_TYPE(SvdbTableItem, svdb_table, svdb_item_ref, svdb_item_unref)
 
 SvdbTableItem *svdb_table_new() {
     GHashTable *table = g_hash_table_new_full(&g_str_hash, &g_str_equal, &g_free,
@@ -51,21 +51,21 @@ SvdbTableItem *svdb_table_read_from_bytes(GBytes *bytes, gboolean trusted, GErro
     } else if (header->signature[0] == GVDB_SWAPPED_SIGNATURE0
                && header->signature[1] == GVDB_SWAPPED_SIGNATURE1
                && guint32_from_le(header->version) == 0) {
-
         byteswapped = TRUE;
     } else {
         goto invalid;
     }
 
-    return svdb_parse_table(data, size, byteswapped, trusted, header->root);
+    return svdb_parse_table(data, size, byteswapped, trusted, header->root, error);
 
-    invalid:
-    g_set_error_literal(error, G_FILE_ERROR, G_FILE_ERROR_INVAL, "invalid gvdb header");
+invalid:
+    g_set_error_literal(error, G_FILE_ERROR, G_FILE_ERROR_INVAL, "corrupted gvdb file(invalid gvdb header)");
     return NULL;
 }
 
 gboolean svdb_table_set(SvdbTableItem *table, const gchar *key,
-                              SvdbTableItem *value) {
+                        SvdbTableItem *value, GError **error) {
+    GError *tmp_error = NULL;
     if (!table || table->type != SVDB_TYPE_TABLE || !key) {
         return FALSE;
     }
@@ -73,7 +73,13 @@ gboolean svdb_table_set(SvdbTableItem *table, const gchar *key,
     if (!value) {
         return g_hash_table_remove(table->table, key);
     }
-    svdb_item_set_parent(value, table);
+    svdb_item_set_parent(value, table, &tmp_error);
+
+    if (tmp_error) {
+        g_propagate_error(error, tmp_error);
+        return FALSE;
+    }
+
     return g_hash_table_replace(table->table, (gpointer) g_strdup(key), svdb_item_ref(value));;
 }
 
@@ -90,11 +96,11 @@ SvdbTableItem *svdb_table_get(const SvdbTableItem *table, const gchar *key) {
  * svdb_table_list_child
  * Returns: (transfer full): value must be freed with `g_strfreev`
  */
-gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size) {
+gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size, GError **error) {
     gsize tmp;
     gchar **result;
     gchar **str_iter;
-    SvdbTableItem* item;
+    SvdbTableItem *item;
     const gchar *key;
 
     GHashTableIter iter;
@@ -120,8 +126,7 @@ gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size) {
     while (g_hash_table_iter_next(&iter, (gpointer) &key, (gpointer) &item)) {
         if (item->type == SVDB_TYPE_TABLE) {
             *str_iter = g_strdup_printf("%s/", key);
-        } 
-        else {
+        } else {
             *str_iter = g_strdup(key);
         }
         ++str_iter;
@@ -129,8 +134,11 @@ gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size) {
     *str_iter = NULL;
 
     // result real length must be equal `g_hash_table_size()`.
-    // TODO: replace by GError* and return
-    g_assert(str_iter - result == *size);
+    if (str_iter - result != *size) {
+        g_set_error_literal(error, SVDB_ERROR, 0,
+                            "internal error(result real child count is'nt equal `g_hash_table_size()`)");
+        return NULL;
+    }
 
     return result;
 }
@@ -149,10 +157,12 @@ SvdbTableItem *svdb_item_new() {
 }
 
 gboolean svdb_item_set_list(SvdbTableItem *item, const SvdbListElement *list,
-                                  guint32 length) {
+                            guint32 length, GError **error) {
     if (!item) {
         return FALSE;
     }
+
+    GError *tmp_error = NULL;
 
     svdb_item_clear(item);
     item->type = SVDB_TYPE_LIST;
@@ -166,7 +176,15 @@ gboolean svdb_item_set_list(SvdbTableItem *item, const SvdbListElement *list,
     item->childs = 0;
 
     for (guint32 i = 0; i < length; ++i) {
-        svdb_item_set_parent(list[i].item, item);
+        svdb_item_set_parent(list[i].item, item, &tmp_error);
+        if (tmp_error) {
+            g_propagate_error(error, tmp_error);
+            /// TODO: This functionality is very unstable and has one UB. It needs to be stabilized.
+            return FALSE;
+        }
+    }
+
+    for (guint32 i = 0; i < length; ++i) {
         item->list[i].item = svdb_item_ref(list[i].item);
         item->list[i].key = g_strdup(list[i].key);
     }
@@ -175,10 +193,11 @@ gboolean svdb_item_set_list(SvdbTableItem *item, const SvdbListElement *list,
 }
 
 gboolean svdb_item_list_append(SvdbTableItem *item, const SvdbListElement *list,
-                                     guint32 length) {
+                               guint32 length, GError **error) {
     if (!item) {
         return FALSE;
     }
+    GError *tmp_error = NULL;
 
     if (item->type != SVDB_TYPE_LIST) {
         svdb_item_clear(item);
@@ -194,7 +213,15 @@ gboolean svdb_item_list_append(SvdbTableItem *item, const SvdbListElement *list,
     item->list = g_realloc(item->list, item->length * sizeof *item->list);
 
     for (gsize i = old_length; i < item->length; ++i) {
-        svdb_item_set_parent(list[i - old_length].item, item);
+        svdb_item_set_parent(list[i - old_length].item, item, &tmp_error);
+        if (tmp_error) {
+            g_propagate_error(error, tmp_error);
+            /// TODO: This functionality is very unstable and has one UB. It needs to be stabilized.
+            return FALSE;
+        }
+    }
+
+    for (gsize i = old_length; i < item->length; ++i) {
         item->list[i].item = svdb_item_ref(list[i - old_length].item);
         item->list[i].key = g_strdup(list[i].key);
     }
@@ -203,23 +230,24 @@ gboolean svdb_item_list_append(SvdbTableItem *item, const SvdbListElement *list,
 }
 
 gboolean svdb_item_list_append_element(SvdbTableItem *list,
-                                             SvdbListElement element) {
-    return svdb_item_list_append_value(list, element.key, element.item);
+                                       SvdbListElement element, GError **error) {
+    return svdb_item_list_append_value(list, element.key, element.item, error);
 }
 
-gboolean svdb_item_list_append_variant(SvdbTableItem *list, const gchar *key, GVariant *value) {
+gboolean svdb_item_list_append_variant(SvdbTableItem *list, const gchar *key, GVariant *value, GError **error) {
     SvdbTableItem *item = svdb_item_new();
     svdb_item_set_variant(item, value);
-    gboolean result = svdb_item_list_append_value(list, key, item);
+    gboolean result = svdb_item_list_append_value(list, key, item, error);
 
     svdb_item_unref(item);
     return result;
 }
 
-gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, SvdbTableItem *value) {
+gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, SvdbTableItem *value, GError **error) {
     if (!list) {
         return FALSE;
     }
+    GError *tmp_error = NULL;
 
     if (list->type != SVDB_TYPE_LIST) {
         svdb_item_clear(list);
@@ -234,7 +262,14 @@ gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, Svdb
     for (int i = 0; i < list->length; ++i) {
         if (strcmp(list->list[i].key, key) == 0) {
             svdb_item_clear_unref_dettach(list->list[i].item);
-            svdb_item_set_parent(value, list);
+
+            svdb_item_set_parent(value, list, &tmp_error);
+            if (tmp_error) {
+                g_propagate_error(error, tmp_error);
+                /// TODO: This functionality is very unstable and has one UB. It needs to be stabilized.
+                return FALSE;
+            }
+
             list->list[i].item = svdb_item_ref(value);
             return TRUE;
         }
@@ -242,7 +277,12 @@ gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, Svdb
 
     ++list->length;
     list->list = g_realloc(list->list, list->length * sizeof *list->list);
-    svdb_item_set_parent(value, list);
+    svdb_item_set_parent(value, list, &tmp_error);
+    if (tmp_error) {
+        g_propagate_error(error, tmp_error);
+        /// TODO: This functionality is very unstable and has one UB. It needs to be stabilized.
+        return FALSE;
+    }
 
     list->list[list->length - 1].key = g_strdup(key);
     list->list[list->length - 1].item = svdb_item_ref(value);
@@ -275,7 +315,8 @@ gboolean svdb_item_list_remove_element(SvdbTableItem *item, const gchar *element
     return TRUE;
 }
 
-gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gsize nelements, gboolean exist_cancel) {
+gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gsize nelements,
+                                        gboolean exist_cancel) {
     if (!item || !elements || item->type != SVDB_TYPE_LIST) {
         return FALSE;
     }
@@ -285,8 +326,8 @@ gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **eleme
     }
 
     gsize size = 0;
-    gboolean* exists = NULL;
-    SvdbListElement* new_list = NULL;
+    gboolean *exists = NULL;
+    SvdbListElement *new_list = NULL;
 
     if (exist_cancel) {
         exists = g_new0(gboolean, nelements);
@@ -453,8 +494,7 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
                     if (tmp) {
                         if (!other) {
                             other = g_string_new(NULL);
-                        }
-                        else {
+                        } else {
                             g_string_append_len(other, "\n\n", 2);
                         }
                         g_string_append_len(other, tmp->str, tmp->len);
@@ -470,8 +510,7 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
                     result = g_string_new_len("[", 1);
                     if (path[1] == '\0') {
                         g_string_append_len(result, "/", 1);
-                    }
-                    else {
+                    } else {
                         g_string_append_len(result, path + 1, strlen(path + 1) - 1);
                     }
                     g_string_append_c(result, ']');
@@ -483,8 +522,7 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
             if (other) {
                 if (!result) {
                     result = other;
-                }
-                else {
+                } else {
                     g_string_append_len(result, "\n\n", 2);
                     g_string_append_len(result, other->str, other->len);
                     g_string_free(other, TRUE);
@@ -498,7 +536,7 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
         }
 
         case SVDB_TYPE_TABLE: {
-            const gchar* key;
+            const gchar *key;
             const SvdbTableItem *key_item;
             GHashTableIter iter;
             GString *result;
@@ -529,7 +567,7 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
     }
 }
 
-SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar* key) {
+SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar *key) {
     if (!list || list->type != SVDB_TYPE_LIST || list->length == 0 || !key) {
         return NULL;
     }
@@ -548,7 +586,7 @@ SvdbTableItem *svdb_item_ref(const SvdbTableItem *item) {
     if (!item) {
         return NULL;
     }
-    ++((SvdbTableItem*)item)->refcount;
+    ++((SvdbTableItem *) item)->refcount;
     return (gpointer) item;
 }
 
@@ -560,4 +598,12 @@ void svdb_item_unref(SvdbTableItem *item) {
         svdb_item_clear(item);
         g_free(item);
     }
+}
+
+GQuark svdb_error_quark(void) {
+    static GQuark quark = -1;
+    if (quark == -1) {
+        quark = g_quark_from_static_string("libsvdb");
+    }
+    return quark;
 }

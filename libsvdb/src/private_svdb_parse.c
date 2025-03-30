@@ -4,15 +4,14 @@
 
 static gconstpointer svdb_table_dereference(gconstpointer file_data, gsize file_size,
                                             const struct svdb_pointer pointer, gint alignment,
-                                            gsize *block_size)
-{
+                                            gsize *block_size) {
     guint32 start, end;
 
     start = guint32_from_le(pointer.start);
     end = guint32_from_le(pointer.end);
 
-    if G_UNLIKELY (start > end || end > file_size || start & (alignment - 1)
-                   || (alignment & (alignment - 1)))
+    if G_UNLIKELY(start > end || end > file_size || start & (alignment - 1)
+        || (alignment & (alignment - 1)))
         return NULL;
 
     *block_size = end - start;
@@ -21,8 +20,7 @@ static gconstpointer svdb_table_dereference(gconstpointer file_data, gsize file_
 }
 
 static GVariant *svdb_gvdb_item_get_variant(gconstpointer block, gsize block_size, gboolean byteswap,
-                                            gboolean trusted, const struct svdb_hash_item *item)
-{
+                                            gboolean trusted, const struct svdb_hash_item *item) {
     GVariant *variant, *value;
     gconstpointer data;
     GBytes *bytes;
@@ -30,7 +28,7 @@ static GVariant *svdb_gvdb_item_get_variant(gconstpointer block, gsize block_siz
 
     data = svdb_table_dereference(block, block_size, item->value.pointer, 8, &size);
 
-    if G_UNLIKELY (data == NULL) {
+    if G_UNLIKELY(data == NULL) {
         return NULL;
     }
 
@@ -49,18 +47,17 @@ static GVariant *svdb_gvdb_item_get_variant(gconstpointer block, gsize block_siz
     return value;
 }
 
-static void svdb_item_set_parent(SvdbTableItem *item, SvdbTableItem *parent)
-{
+static void svdb_item_set_parent(SvdbTableItem *item, SvdbTableItem *parent, GError **error) {
     if (!parent || !item) {
         return;
     }
     if (item->parent) {
-        // TODO: replace by GError* and return
-        g_error("%s", "trying to attach item to more than one parent.");
+        g_set_error_literal(error, SVDB_ERROR, 0, "trying to attach item to more than one parent.");
+        return;
     }
     if (parent->type == SVDB_TYPE_VARIANT) {
-        // TODO: replace by GError* and return
-        g_error("%s", "trying to attach item to variant.");
+        g_set_error_literal(error, SVDB_ERROR, 0, "trying to attach item to variant.");
+        return;
     }
     item->parent = parent;
     guint32 count = item->childs + 1;
@@ -77,14 +74,13 @@ static void svdb_item_set_parent(SvdbTableItem *item, SvdbTableItem *parent)
 
 
 static gchar *svdb_gvdb_item_get_key(gconstpointer block, gsize block_size,
-                                     const struct svdb_hash_item *item)
-{
+                                     const struct svdb_hash_item *item) {
     guint32 start, end, size;
     start = guint32_from_le(item->key_start);
     size = guint16_from_le(item->key_size);
     end = start + size;
 
-    if G_UNLIKELY (start > end || end > block_size) {
+    if G_UNLIKELY(start > end || end > block_size) {
         return NULL;
     }
 
@@ -92,8 +88,7 @@ static gchar *svdb_gvdb_item_get_key(gconstpointer block, gsize block_size,
 }
 
 static gboolean svdb_parse_table_header(gconstpointer block, gsize block_size,
-                                        const struct svdb_pointer table, SVDBTableHeader *header)
-{
+                                        const struct svdb_pointer table, SVDBTableHeader *header) {
     if (!header) {
         return FALSE;
     }
@@ -103,7 +98,7 @@ static gboolean svdb_parse_table_header(gconstpointer block, gsize block_size,
     memset(header, 0, sizeof *header);
     gvdb_header = svdb_table_dereference(block, block_size, table, 4, &size);
 
-    if G_UNLIKELY (header == NULL || size < sizeof *gvdb_header) {
+    if G_UNLIKELY(header == NULL || size < sizeof *gvdb_header) {
         return FALSE;
     }
 
@@ -114,26 +109,26 @@ static gboolean svdb_parse_table_header(gconstpointer block, gsize block_size,
     header->bloom_shift = header->n_bloom_words >> 27;
     header->n_bloom_words &= (1u << 27) - 1;
 
-    if G_UNLIKELY (header->n_bloom_words * sizeof *header->bloom_words > size) {
+    if G_UNLIKELY(header->n_bloom_words * sizeof *header->bloom_words > size) {
         return FALSE;
     }
 
     size -= header->n_bloom_words * sizeof *header->bloom_words;
-    header->bloom_words = (gconstpointer)(gvdb_header + 1);
+    header->bloom_words = (gconstpointer) (gvdb_header + 1);
 
-    if G_UNLIKELY (header->n_buckets > G_MAXUINT / sizeof *header->hash_buckets
-                   || header->n_buckets * sizeof *header->hash_buckets > size) {
+    if G_UNLIKELY(header->n_buckets > G_MAXUINT / sizeof *header->hash_buckets
+        || header->n_buckets * sizeof *header->hash_buckets > size) {
         return FALSE;
     }
 
     header->hash_buckets = header->bloom_words + header->n_bloom_words;
     size -= header->n_buckets * sizeof(guint32_le);
 
-    if G_UNLIKELY (size % sizeof *header->hash_items) {
+    if G_UNLIKELY(size % sizeof *header->hash_items) {
         return FALSE;
     }
 
-    header->hash_items = (gpointer)(header->hash_buckets + header->n_buckets);
+    header->hash_items = (gpointer) (header->hash_buckets + header->n_buckets);
     header->n_hash_items = size / sizeof *header->hash_items;
 
     return TRUE;
@@ -141,12 +136,11 @@ static gboolean svdb_parse_table_header(gconstpointer block, gsize block_size,
 
 static gboolean svdb_table_list_indecies_from_item(gconstpointer block, gsize block_size,
                                                    const struct svdb_hash_item *item,
-                                                   const guint32_le **list, guint *length)
-{
+                                                   const guint32_le **list, guint *length) {
     gsize size;
     *list = svdb_table_dereference(block, block_size, item->value.pointer, 4, &size);
 
-    if G_LIKELY (*list == NULL || size % 4)
+    if G_LIKELY(*list == NULL || size % 4)
         return FALSE;
 
     *length = size / 4;
@@ -156,15 +150,16 @@ static gboolean svdb_table_list_indecies_from_item(gconstpointer block, gsize bl
 static SvdbTableItem *svdb_parse_table_variant(SVDBTableHeader header, gconstpointer block,
                                                gsize block_size, gboolean byteswap,
                                                gboolean trusted,
-                                               const struct svdb_hash_item *variant)
-{
+                                               const struct svdb_hash_item *variant, GError **error) {
     if (variant->type != 'v') {
+        g_set_error_literal(error, SVDB_ERROR, 0, "internal error(expected variant item)");
         return NULL;
     }
 
     GVariant *value = svdb_gvdb_item_get_variant(block, block_size, byteswap, trusted, variant);
 
     if (value == NULL) {
+        g_set_error_literal(error, SVDB_ERROR, 0, "corrupted gvdb file");
         return NULL;
     }
 
@@ -176,14 +171,13 @@ static SvdbTableItem *svdb_parse_table_variant(SVDBTableHeader header, gconstpoi
 }
 
 static SvdbTableItem *svdb_parse_table(gconstpointer block, gsize block_size, gboolean byteswap,
-                                       gboolean trusted, const struct svdb_pointer table);
+                                       gboolean trusted, const struct svdb_pointer table, GError **error);
 
 
 static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointer block,
                                             gsize block_size, gboolean byteswap,
                                             gboolean trusted,
-                                            const struct svdb_hash_item *list_item)
-{
+                                            const struct svdb_hash_item *list_item, GError **error) {
     if (list_item->type != 'L') {
         return NULL;
     }
@@ -192,13 +186,20 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
     const guint32_le *indecies;
     SvdbListElement *list_elements;
     SvdbListElement *curr;
+    GError *tmp_error = NULL;
 
     if (!svdb_table_list_indecies_from_item(block, block_size, list_item, &indecies, &size)) {
+        g_set_error_literal(error, SVDB_ERROR, 0, "corrupted gvdb file(corrupted list)");
         return NULL;
     }
 
     item = svdb_item_new();
-    svdb_item_set_list(item, NULL, 0);
+    svdb_item_set_list(item, NULL, 0, &tmp_error);
+
+    if (tmp_error) {
+        g_propagate_error(error, tmp_error);
+        return NULL;
+    }
 
     list_elements = g_malloc0(size * sizeof *list_elements);
     curr = list_elements;
@@ -212,44 +213,64 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
         list_element = header.hash_items + itemno;
         curr->key = svdb_gvdb_item_get_key(block, block_size, list_element);
         switch (svdb_item_char_to_type(list_element->type)) {
-        case SVDB_TYPE_VARIANT: {
-            curr->item = svdb_parse_table_variant(header, block, block_size, byteswap, trusted,
-                                                  list_element);
-            if (curr->item) {
-                ++curr;
+            case SVDB_TYPE_VARIANT: {
+                curr->item = svdb_parse_table_variant(header, block, block_size, byteswap, trusted,
+                                                      list_element, &tmp_error);
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(item);
+                    goto error_exit;
+                }
+
+                if (curr->item) {
+                    ++curr;
+                } else {
+                    g_free(curr->key);
+                }
+                break;
             }
-            else {
-                g_free(curr->key);
+            case SVDB_TYPE_LIST: {
+                curr->item = svdb_parse_table_list(header, block, block_size, byteswap, trusted,
+                                                   list_element, &tmp_error);
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(item);
+                    goto error_exit;
+                }
+
+                if (curr->item) {
+                    ++curr;
+                } else {
+                    g_free(curr->key);
+                }
+                break;
             }
-            break;
-        }
-        case SVDB_TYPE_LIST: {
-            curr->item = svdb_parse_table_list(header, block, block_size, byteswap, trusted,
-                                               list_element);
-            if (curr->item) {
-                ++curr;
+            case SVDB_TYPE_TABLE: {
+                SvdbTableItem *table = svdb_parse_table(block, block_size, byteswap, trusted,
+                                                        list_element->value.pointer, &tmp_error);
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(item);
+                    goto error_exit;
+                }
+
+                curr->item = table;
+                if (curr->item) {
+                    ++curr;
+                } else {
+                    g_free(curr->key);
+                }
+                break;
             }
-            else {
-                g_free(curr->key);
-            }
-            break;
-        }
-        case SVDB_TYPE_TABLE: {
-            SvdbTableItem *table = svdb_parse_table(block, block_size, byteswap, trusted,
-                                                    list_element->value.pointer);
-            curr->item = table;
-            if (curr->item) {
-                ++curr;
-            }
-            else {
-                g_free(curr->key);
-            }
-            break;
-        }
         }
     }
 
-    svdb_item_set_list(item, list_elements, curr - list_elements);
+    svdb_item_set_list(item, list_elements, curr - list_elements, &tmp_error);
+    if (tmp_error) {
+        g_propagate_error(error, tmp_error);
+        goto error_exit;
+    }
+
     while (curr > list_elements) {
         --curr;
         svdb_item_unref(curr->item);
@@ -258,13 +279,23 @@ static SvdbTableItem *svdb_parse_table_list(SVDBTableHeader header, gconstpointe
     g_free(list_elements);
 
     return item;
+
+error_exit:
+    svdb_item_unref(item);
+    while (curr > list_elements) {
+        curr--;
+        g_free(curr->key);
+        svdb_item_unref(curr->item);
+    }
+    g_free(list_elements);
+    return NULL;
 }
 
 static SvdbTableItem *svdb_parse_table(gconstpointer block, gsize block_size, gboolean byteswap,
-                                       gboolean trusted, const struct svdb_pointer table)
-{
+                                       gboolean trusted, const struct svdb_pointer table, GError **error) {
     SvdbTableItem *result = svdb_table_new();
     SVDBTableHeader header;
+    GError *tmp_error = NULL;
 
     if (!svdb_parse_table_header(block, block_size, table, &header)) {
         return NULL;
@@ -275,49 +306,81 @@ static SvdbTableItem *svdb_parse_table(gconstpointer block, gsize block_size, gb
             continue;
         }
         switch (svdb_item_char_to_type(header.hash_items[i].type)) {
-        case SVDB_TYPE_VARIANT: {
-            SvdbTableItem *item = svdb_parse_table_variant(header, block, block_size, byteswap,
-                                                           trusted, header.hash_items + i);
+            case SVDB_TYPE_VARIANT: {
+                SvdbTableItem *item = svdb_parse_table_variant(header, block, block_size, byteswap,
+                                                               trusted, header.hash_items + i, &tmp_error);
 
-            if (!item) {
-                continue;
-            }
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(result);
+                    return NULL;
+                }
 
-            svdb_item_set_parent(item, result);
-            g_hash_table_insert(result->table,
-                                svdb_gvdb_item_get_key(block, block_size, header.hash_items + i),
-                                item);
-            break;
-        }
-        case SVDB_TYPE_LIST: {
-            SvdbTableItem *item = svdb_parse_table_list(header, block, block_size, byteswap,
-                                                        trusted, header.hash_items + i);
-
-            if (!item) {
-                continue;
-            }
-
-            svdb_item_set_parent(item, result);
-            g_hash_table_insert(result->table,
-                                svdb_gvdb_item_get_key(block, block_size, header.hash_items + i),
-                                item);
-
-            break;
-        }
-        case SVDB_TYPE_TABLE: {
-            SvdbTableItem *value = svdb_parse_table(block, block_size, byteswap, trusted,
-                                                    header.hash_items[i].value.pointer);
-
-            if (value == NULL) {
+                svdb_item_set_parent(item, result, &tmp_error);
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(item);
+                    svdb_item_unref(result);
+                    return NULL;
+                }
+                g_hash_table_insert(result->table,
+                                    svdb_gvdb_item_get_key(block, block_size, header.hash_items + i),
+                                    item);
                 break;
             }
+            case SVDB_TYPE_LIST: {
+                SvdbTableItem *item = svdb_parse_table_list(header, block, block_size, byteswap,
+                                                            trusted, header.hash_items + i, &tmp_error);
 
-            svdb_item_set_parent(value, result);
-            g_hash_table_insert(result->table,
-                                svdb_gvdb_item_get_key(block, block_size, header.hash_items + i),
-                                value);
-            break;
-        }
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(result);
+                    return NULL;
+                }
+
+                if (!item) {
+                    continue;
+                }
+
+                svdb_item_set_parent(item, result, &tmp_error);
+
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(item);
+                    svdb_item_unref(result);
+                    return NULL;
+                }
+
+                g_hash_table_insert(result->table,
+                                    svdb_gvdb_item_get_key(block, block_size, header.hash_items + i),
+                                    item);
+
+                break;
+            }
+            case SVDB_TYPE_TABLE: {
+                SvdbTableItem *value = svdb_parse_table(block, block_size, byteswap, trusted,
+                                                        header.hash_items[i].value.pointer, &tmp_error);
+
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(result);
+                    return NULL;
+                }
+
+                svdb_item_set_parent(value, result, &tmp_error);
+
+                if (tmp_error) {
+                    g_propagate_error(error, tmp_error);
+                    svdb_item_unref(value);
+                    svdb_item_unref(result);
+                    return NULL;
+                }
+
+                g_hash_table_insert(result->table,
+                                    svdb_gvdb_item_get_key(block, block_size, header.hash_items + i),
+                                    value);
+                break;
+            }
         }
     }
     return result;

@@ -63,7 +63,7 @@ SvdbTableItem *svdb_table_read_from_bytes(GBytes *bytes, gboolean trusted, GErro
 /// @param key - key, for set.
 /// @param value - value, for set. If NULL <=> svdb_table_unset.
 /// @return current table.
-gboolean svdb_table_set(SvdbTableItem *table, const gchar *key, SvdbTableItem *value);
+gboolean svdb_table_set(SvdbTableItem *table, const gchar *key, SvdbTableItem *value, GError **error);
 
 /// @brief Get table item by key. 
 /// @param table - current table.
@@ -96,7 +96,7 @@ GBytes *svdb_table_get_raw(SvdbTableItem *table, gboolean byteswap, GError **err
 /// @param size - pointer for return size(or NULL).
 /// @return Array of strings with child names, or NULL(if no child is present or table isn't table :) ).
 /// Value must be freed with `g_strfreev`
-gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size);
+gchar **svdb_table_list_child(const SvdbTableItem *table, gsize *size, GError **error);
 
 /// @brief Create new empty item.
 /// @return New empty item (SVDB_TYPE_NONE).
@@ -108,7 +108,7 @@ SvdbTableItem *svdb_item_new();
 /// @param length - list length.
 /// @return return current item.
 gboolean svdb_item_set_list(SvdbTableItem *item, const SvdbListElement *list,
-                                  guint32 length);
+                            guint32 length, GError **error);
 
 /// @brief Set item value to list, or append to, if it allready non-empty list.
 /// @param item - current item.
@@ -116,27 +116,27 @@ gboolean svdb_item_set_list(SvdbTableItem *item, const SvdbListElement *list,
 /// @param length - list length.
 /// @return return current item.
 gboolean svdb_item_list_append(SvdbTableItem *item, const SvdbListElement *list,
-                                     guint32 length);
+                               guint32 length, GError **error);
 
 /// @brief Set list value to list, or append to, if it allready non-empty list.
 /// @param list - current list.
 /// @param element - single element to append.
 /// @return return current list.
-gboolean svdb_item_list_append_element(SvdbTableItem *list, SvdbListElement element);
+gboolean svdb_item_list_append_element(SvdbTableItem *list, SvdbListElement element, GError **error);
 
 /// @brief Set list value to list, or append to, if it allready non-empty list.
 /// @param list - current list.
 /// @param key - key of appended value.
 /// @param variant - value of appended value.
 /// @return return current list.
-gboolean svdb_item_list_append_variant(SvdbTableItem *list, const gchar *key, GVariant *value);
+gboolean svdb_item_list_append_variant(SvdbTableItem *list, const gchar *key, GVariant *value, GError **error);
 
 /// @brief Set list value to list, or append to, if it allready non-empty list.
 /// @param list - current list.
 /// @param key - key of appended value.
 /// @param value - value of appended value.
 /// @return return current list.
-gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, SvdbTableItem *value);
+gboolean svdb_item_list_append_value(SvdbTableItem *list, const gchar *key, SvdbTableItem *value, GError **error);
 
 /// @brief Remove item from list by key.
 /// @param item - current item.
@@ -150,7 +150,8 @@ gboolean svdb_item_list_remove_element(SvdbTableItem *item, const gchar *element
 /// @param nelements - elements keys count.
 /// @param exist_cancel - if TRUE even one key is missing, the operation will be canceled. (+O(n*m) overhead, n - list count, m - elements count)
 /// @return if successful return current item, or NULL.
-gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gsize nelements, gboolean exist_cancel);
+gboolean svdb_item_list_remove_elements(SvdbTableItem *item, const gchar **elements, gsize nelements,
+                                        gboolean exist_cancel);
 
 /// @brief Clear current list to empty state.
 /// @param item - current item.
@@ -190,7 +191,7 @@ GString *svdb_item_dump(const SvdbTableItem *item, const gchar *path, gboolean v
 /// @param list - current list.
 /// @param key - element path.
 /// @return child SvdbTableItem (free with svdb_item_unref) or NULL.
-SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar* key);
+SvdbTableItem *svdb_item_list_get_element(const SvdbTableItem *list, const gchar *key);
 
 /// @brief Increase refcounter for current item.
 /// @param item - current item.
@@ -207,7 +208,7 @@ void svdb_item_unref(SvdbTableItem *item);
 /// @param is_dir - if path is dir (end with '/') (return SVDB_TYPE_TABLE).
 /// @param error - set value to error, if error occured.
 /// @return if successful and `is_dir == TRUE`(`FALSE`), return child table (list/variant) by path.
-SvdbTableItem* svdb_table_join_to(const SvdbTableItem* table, const gchar* path, gboolean is_dir, GError** error);
+SvdbTableItem *svdb_table_join_to(const SvdbTableItem *table, const gchar *path, gboolean is_dir, GError **error);
 
 /// @brief Dump table by path.
 /// @param table - root table for path context.

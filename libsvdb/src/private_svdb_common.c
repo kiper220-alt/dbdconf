@@ -10,6 +10,10 @@
 typedef struct { guint16 value; } guint16_le;
 typedef struct { guint32 value; } guint32_le;
 
+#define SVDB_ERROR (svdb_error_quark())
+GQuark svdb_error_quark(void);
+
+
 struct svdb_pointer {
   guint32_le start;
   guint32_le end;
