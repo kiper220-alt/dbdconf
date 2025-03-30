@@ -50,7 +50,7 @@ _dbdconf_completion() {
                     # If the path is not started or does not begin with "/", we suggest "/"
                     COMPREPLY=("/")
                 else
-                    # Разбираем путь на базовый путь и префикс
+                    # We parse the path into a base path and a prefix
                     if [[ "$cur" == */ ]]; then
                         base_path="$cur"
                         prefix=""
